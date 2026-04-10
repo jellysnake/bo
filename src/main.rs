@@ -21,6 +21,11 @@ fn default_output_dir() -> PathBuf {
 }
 
 fn run(cli: Cli) -> Result<(), String> {
+    // Validate URL
+    if !cli.url.starts_with("http://") && !cli.url.starts_with("https://") {
+        return Err(format!("invalid URL (must start with http:// or https://): {}", cli.url));
+    }
+
     let output_dir = cli.output_dir.unwrap_or_else(default_output_dir);
 
     // Ensure output dir exists
