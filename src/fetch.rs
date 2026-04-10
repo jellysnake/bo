@@ -6,8 +6,6 @@ use std::time::Duration;
 
 pub struct FetchResult {
     pub html: String,
-    pub final_url: String,
-    pub status: u16,
 }
 
 #[derive(Debug)]
@@ -83,7 +81,6 @@ fn try_fetch(client: &reqwest::blocking::Client, url: &str) -> Result<FetchResul
     })?;
 
     let status = response.status().as_u16();
-    let final_url = response.url().to_string();
 
     // Check HTTP status
     if status >= 400 {
@@ -104,11 +101,7 @@ fn try_fetch(client: &reqwest::blocking::Client, url: &str) -> Result<FetchResul
 
     let html = response.text().map_err(|e| FetchError::Network(e.to_string()))?;
 
-    Ok(FetchResult {
-        html,
-        final_url,
-        status,
-    })
+    Ok(FetchResult { html })
 }
 
 #[cfg(test)]
@@ -119,7 +112,6 @@ mod tests {
     #[ignore] // requires network
     fn fetch_known_good_url() {
         let result = fetch_url("https://example.com").unwrap();
-        assert_eq!(result.status, 200);
         assert!(result.html.contains("Example Domain"));
     }
 
