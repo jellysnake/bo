@@ -51,7 +51,7 @@ pub fn append_entry(path: &Path, entry: &LedgerEntry) -> io::Result<()> {
         .append(true)
         .open(path)?;
     let json = serde_json::to_string(entry)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        .map_err(io::Error::other)?;
     writeln!(file, "{}", json)?;
     Ok(())
 }
