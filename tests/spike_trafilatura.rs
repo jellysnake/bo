@@ -103,7 +103,10 @@ const NON_UTF8_CONTENT: &str = r#"
 fn spike_simple_article_text() {
     let opts = Options::default();
     let result = extract(SIMPLE_ARTICLE, &opts);
-    assert!(result.is_ok(), "extract() returned None for a simple article");
+    assert!(
+        result.is_ok(),
+        "extract() returned None for a simple article"
+    );
     let result = result.unwrap();
     assert!(!result.content_text.is_empty(), "content_text is empty");
     assert!(
@@ -112,7 +115,10 @@ fn spike_simple_article_text() {
         &result.content_text[..200.min(result.content_text.len())]
     );
     println!("=== TITLE ===\n{}", result.metadata.title);
-    println!("=== CONTENT_TEXT (first 500) ===\n{}", &result.content_text[..500.min(result.content_text.len())]);
+    println!(
+        "=== CONTENT_TEXT (first 500) ===\n{}",
+        &result.content_text[..500.min(result.content_text.len())]
+    );
 }
 
 #[test]
@@ -123,7 +129,10 @@ fn spike_simple_article_markdown() {
     println!("=== CONTENT_MARKDOWN ===\n{md}");
 
     // Check heading hierarchy preserved
-    assert!(md.contains("# ") || md.contains("## "), "markdown has no headings: {md}");
+    assert!(
+        md.contains("# ") || md.contains("## "),
+        "markdown has no headings: {md}"
+    );
     // Ideally we see ## for h2 and ### for h3
     let has_h2 = md.contains("## ");
     let has_h3 = md.contains("### ");
@@ -146,8 +155,10 @@ fn spike_links_stripped_by_default() {
     println!("Markdown contains links: {has_md_links}");
 
     // The anchor text should still be present
-    assert!(text.contains("Rust Programming Language") || text.contains("Python"),
-        "anchor text was lost entirely");
+    assert!(
+        text.contains("Rust Programming Language") || text.contains("Python"),
+        "anchor text was lost entirely"
+    );
 }
 
 #[test]
@@ -173,18 +184,27 @@ fn spike_tables() {
     println!("=== TABLE TEXT ===\n{text}");
 
     // At minimum the cell content should be present
-    assert!(text.contains("Rust") && text.contains("Python"),
-        "table cell content missing from text output");
+    assert!(
+        text.contains("Rust") && text.contains("Python"),
+        "table cell content missing from text output"
+    );
 }
 
 #[test]
 fn spike_empty_page() {
     let opts = Options::default();
     let result = extract(EMPTY_PAGE, &opts);
-    println!("=== EMPTY PAGE RESULT ===\n{:?}", result.as_ref().ok().map(|r| &r.content_text));
+    println!(
+        "=== EMPTY PAGE RESULT ===\n{:?}",
+        result.as_ref().ok().map(|r| &r.content_text)
+    );
     // Should return None or empty content — either is acceptable
     if let Ok(r) = &result {
-        println!("Got content (len={}): {:?}", r.content_text.len(), &r.content_text);
+        println!(
+            "Got content (len={}): {:?}",
+            r.content_text.len(),
+            &r.content_text
+        );
     }
 }
 
@@ -192,7 +212,10 @@ fn spike_empty_page() {
 fn spike_login_wall() {
     let opts = Options::default();
     let result = extract(MINIMAL_BOILERPLATE, &opts);
-    println!("=== LOGIN WALL RESULT ===\n{:?}", result.as_ref().ok().map(|r| &r.content_text));
+    println!(
+        "=== LOGIN WALL RESULT ===\n{:?}",
+        result.as_ref().ok().map(|r| &r.content_text)
+    );
     // Likely returns None or very minimal content
 }
 
@@ -200,12 +223,18 @@ fn spike_login_wall() {
 fn spike_non_utf8_html_entities() {
     let opts = Options::default();
     let result = extract(NON_UTF8_CONTENT, &opts);
-    assert!(result.is_ok(), "extract() returned None for HTML-entity content");
+    assert!(
+        result.is_ok(),
+        "extract() returned None for HTML-entity content"
+    );
     let result = result.unwrap();
     println!("=== NON-UTF8 TEXT ===\n{}", result.content_text);
     println!("=== NON-UTF8 TITLE ===\n{}", result.metadata.title);
     // café should be decoded from &eacute;
-    assert!(result.content_text.contains("caf") , "content missing café reference");
+    assert!(
+        result.content_text.contains("caf"),
+        "content missing café reference"
+    );
 }
 
 #[test]
@@ -224,8 +253,14 @@ fn spike_large_document() {
     body.push_str("</article></body></html>");
 
     let html_size = body.len();
-    println!("Generated HTML size: {html_size} bytes ({:.1} KB)", html_size as f64 / 1024.0);
-    assert!(html_size > 100_000, "test HTML should be >100KB, got {html_size}");
+    println!(
+        "Generated HTML size: {html_size} bytes ({:.1} KB)",
+        html_size as f64 / 1024.0
+    );
+    assert!(
+        html_size > 100_000,
+        "test HTML should be >100KB, got {html_size}"
+    );
 
     let opts = Options::default();
     let result = extract(&body, &opts);
@@ -234,15 +269,26 @@ fn spike_large_document() {
     let text_len = result.content_text.len();
     let md = result.content_markdown();
     let md_len = md.len();
-    println!("Extracted text size: {text_len} bytes ({:.1} KB)", text_len as f64 / 1024.0);
-    println!("Extracted markdown size: {md_len} bytes ({:.1} KB)", md_len as f64 / 1024.0);
+    println!(
+        "Extracted text size: {text_len} bytes ({:.1} KB)",
+        text_len as f64 / 1024.0
+    );
+    println!(
+        "Extracted markdown size: {md_len} bytes ({:.1} KB)",
+        md_len as f64 / 1024.0
+    );
 
     // Should extract a substantial portion of the content
-    assert!(text_len > 50_000, "extracted text suspiciously small: {text_len} bytes");
+    assert!(
+        text_len > 50_000,
+        "extracted text suspiciously small: {text_len} bytes"
+    );
 
     // Check no truncation — last paragraphs should be present
-    assert!(result.content_text.contains("Paragraph 1999"),
-        "last paragraph missing — content may be truncated");
+    assert!(
+        result.content_text.contains("Paragraph 1999"),
+        "last paragraph missing — content may be truncated"
+    );
 }
 
 #[test]

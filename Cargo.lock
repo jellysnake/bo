@@ -116,6 +116,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bo"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "trafilatura",
+ "url",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -945,20 +960,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "url",
-]
-
-[[package]]
-name = "link-stash"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "clap",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "trafilatura",
 ]
 
 [[package]]
