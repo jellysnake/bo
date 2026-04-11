@@ -959,6 +959,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "trafilatura",
+ "url",
 ]
 
 [[package]]

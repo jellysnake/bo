@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/simon/Code/bo/.claude/hooks/check-rust.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

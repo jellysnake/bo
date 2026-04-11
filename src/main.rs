@@ -1,4 +1,6 @@
-use link_stash::{fetch, extract, slug, ledger, markdown};
+use chrono::Utc;
+use link_stash::{extract, fetch, ledger, markdown, slug};
+use url::Url;
 
 use clap::Parser;
 use std::path::PathBuf;
@@ -21,10 +23,15 @@ fn default_output_dir() -> PathBuf {
 }
 
 fn run(cli: Cli) -> Result<(), String> {
-    // Validate URL
-    if !cli.url.starts_with("http://") && !cli.url.starts_with("https://") {
-        return Err(format!("invalid URL (must start with http:// or https://): {}", cli.url));
+    // Validate URL — must be HTTP/HTTPS and parseable
+    let parsed_url = Url::parse(&cli.url).map_err(|e| format!("invalid URL: {}", e))?;
+    if parsed_url.scheme() != "http" && parsed_url.scheme() != "https" {
+        return Err(format!(
+            "invalid URL scheme '{}': must be http or https",
+            parsed_url.scheme()
+        ));
     }
+    let url_str = parsed_url.as_str().to_string();
 
     let output_dir = cli.output_dir.unwrap_or_else(default_output_dir);
 
@@ -35,17 +42,16 @@ fn run(cli: Cli) -> Result<(), String> {
     let ledger_path = output_dir.join("ledger.jsonl");
 
     // Check for duplicate
-    let entries = ledger::read_ledger(&ledger_path)
-        .map_err(|e| format!("failed to read ledger: {}", e))?;
+    let entries =
+        ledger::read_ledger(&ledger_path).map_err(|e| format!("failed to read ledger: {}", e))?;
 
-    if let Some(existing) = ledger::is_duplicate(&entries, &cli.url) {
-        return Err(format!("already stashed: {} → {}", cli.url, existing.file));
+    if let Some(existing) = ledger::is_duplicate(&entries, &url_str) {
+        return Err(format!("already stashed: {} → {}", url_str, existing.file));
     }
 
     // Fetch
-    eprintln!("fetching {}...", cli.url);
-    let fetch_result = fetch::fetch_url(&cli.url)
-        .map_err(|e| format!("fetch failed: {}", e))?;
+    eprintln!("fetching {}...", url_str);
+    let fetch_result = fetch::fetch_url(&url_str).map_err(|e| format!("fetch failed: {}", e))?;
 
     // Extract
     let content = extract::extract_content(&fetch_result.html)
@@ -53,15 +59,16 @@ fn run(cli: Cli) -> Result<(), String> {
 
     // Generate slug
     let title_ref = content.title.as_deref().unwrap_or("");
-    let base_slug = slug::slugify(title_ref, &cli.url);
-    let filename = slug::resolve_slug(&base_slug, &cli.url, &output_dir);
+    let base_slug = slug::slugify(title_ref, &url_str);
+    let filename = slug::resolve_slug(&base_slug, &url_str, &output_dir);
 
     // Format and write markdown
-    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let now = Utc::now();
+    let now_str = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let doc = markdown::format_document(
         content.title.as_deref(),
         &cli.url,
-        &now,
+        &now_str,
         &content.body_markdown,
     );
 
@@ -70,14 +77,14 @@ fn run(cli: Cli) -> Result<(), String> {
 
     // Append to ledger
     let entry = ledger::LedgerEntry {
-        url: cli.url.clone(),
+        url: url_str,
         fetched_at: now,
         file: format!("{}.md", filename),
     };
     ledger::append_entry(&ledger_path, &entry)
         .map_err(|e| format!("failed to update ledger: {}", e))?;
 
-    println!("✓ stashed: {} → {}.md", cli.url, filename);
+    println!("✓ stashed: {} → {}.md", entry.url, filename);
     Ok(())
 }
 

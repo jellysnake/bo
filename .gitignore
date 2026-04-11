@@ -5,3 +5,6 @@
 .env
 /specs
 /scratchpad
+
+# claude worktrees (keep hooks/settings tracked)
+/.claude/worktrees/
