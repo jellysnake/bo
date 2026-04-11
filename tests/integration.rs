@@ -10,37 +10,37 @@ fn run_pipeline(url: &str, html: &str, output_dir: &std::path::Path) -> Result<S
     let ledger_path = output_dir.join("ledger.jsonl");
 
     // Check duplicate
-    let entries = link_stash::ledger::read_ledger(&ledger_path).map_err(|e| e.to_string())?;
-    if let Some(existing) = link_stash::ledger::is_duplicate(&entries, url) {
+    let entries = bo::ledger::read_ledger(&ledger_path).map_err(|e| e.to_string())?;
+    if let Some(existing) = bo::ledger::is_duplicate(&entries, url) {
         return Err(format!("already stashed: {} → {}", url, existing.file));
     }
 
     // Extract
-    let content = link_stash::extract::extract_content(html).map_err(|e| e.to_string())?;
+    let content = bo::extract::extract_content(html).map_err(|e| e.to_string())?;
 
     // Slug
     let title_ref = content.title.as_deref().unwrap_or("");
-    let base_slug = link_stash::slug::slugify(title_ref, url);
-    let filename = link_stash::slug::resolve_slug(&base_slug, url, output_dir);
+    let base_slug = bo::slug::slugify(title_ref, url);
+    let filename = bo::slug::resolve_slug(&base_slug, url, output_dir);
 
     // Format + write
     let now: chrono::DateTime<chrono::Utc> = "2025-01-15T09:32:00Z".parse().unwrap();
     let now_str = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let doc = link_stash::markdown::format_document(
+    let doc = bo::markdown::format_document(
         content.title.as_deref(),
         url,
         &now_str,
         &content.body_markdown,
     );
-    link_stash::markdown::write_document(output_dir, &filename, &doc).map_err(|e| e.to_string())?;
+    bo::markdown::write_document(output_dir, &filename, &doc).map_err(|e| e.to_string())?;
 
     // Ledger
-    let entry = link_stash::ledger::LedgerEntry {
+    let entry = bo::ledger::LedgerEntry {
         url: url.to_string(),
         fetched_at: now,
         file: format!("{}.md", filename),
     };
-    link_stash::ledger::append_entry(&ledger_path, &entry).map_err(|e| e.to_string())?;
+    bo::ledger::append_entry(&ledger_path, &entry).map_err(|e| e.to_string())?;
 
     Ok(format!("{}.md", filename))
 }
@@ -87,7 +87,7 @@ fn full_pipeline_happy_path() {
     assert!(content.contains("Section One"));
 
     // Ledger has one entry
-    let entries = link_stash::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
+    let entries = bo::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].url, "https://example.com/article");
 }
@@ -103,7 +103,7 @@ fn duplicate_rejected() {
     assert!(result.unwrap_err().contains("already stashed"));
 
     // Ledger still has only one entry
-    let entries = link_stash::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
+    let entries = bo::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
     assert_eq!(entries.len(), 1);
 }
 
@@ -132,7 +132,7 @@ fn slug_collision_disambiguated() {
     );
 
     // Ledger has two entries
-    let entries = link_stash::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
+    let entries = bo::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
     assert_eq!(entries.len(), 2);
 }
 
@@ -186,6 +186,6 @@ fn near_duplicate_urls_both_stored() {
     assert!(dir.path().join(&file1).exists());
     assert!(dir.path().join(&file2).exists());
 
-    let entries = link_stash::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
+    let entries = bo::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
     assert_eq!(entries.len(), 2);
 }
