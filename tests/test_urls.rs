@@ -1,7 +1,8 @@
 // Test URL constants for integration testing
 
 /// Standard articles — happy path
-pub const ARTICLE_WIKIPEDIA: &str = "https://en.wikipedia.org/wiki/Rust_(programming_language)";
+pub const ARTICLE_WIKIPEDIA_1: &str = "https://en.wikipedia.org/wiki/Jaya_Sri_Maha_Bodhi";
+pub const ARTICLE_WIKIPEDIA_2: &str = "https://en.wikipedia.org/wiki/Rust_(programming_language)";
 pub const ARTICLE_BLOG: &str = "https://blog.rust-lang.org/2025/02/20/Rust-1.85.0/";
 
 /// Link-heavy page
