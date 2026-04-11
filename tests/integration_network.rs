@@ -20,7 +20,7 @@ fn run_binary(url: &str, output_dir: &std::path::Path) -> std::process::Output {
 #[ignore]
 fn network_happy_path_wikipedia() {
     let dir = TempDir::new().unwrap();
-    let out = run_binary(test_urls::ARTICLE_WIKIPEDIA, dir.path());
+    let out = run_binary(test_urls::ARTICLE_WIKIPEDIA_2, dir.path());
     assert!(
         out.status.success(),
         "stderr: {}",
@@ -114,11 +114,11 @@ fn network_duplicate_rejected() {
     let dir = TempDir::new().unwrap();
 
     // First attempt succeeds
-    let out1 = run_binary(test_urls::ARTICLE_WIKIPEDIA, dir.path());
+    let out1 = run_binary(test_urls::ARTICLE_WIKIPEDIA_2, dir.path());
     assert!(out1.status.success());
 
     // Second attempt rejected
-    let out2 = run_binary(test_urls::ARTICLE_WIKIPEDIA, dir.path());
+    let out2 = run_binary(test_urls::ARTICLE_WIKIPEDIA_2, dir.path());
     assert!(!out2.status.success());
     let stderr = String::from_utf8_lossy(&out2.stderr);
     assert!(stderr.contains("already stashed"), "stderr: {stderr}");
