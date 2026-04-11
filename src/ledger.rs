@@ -1,5 +1,6 @@
 // JSONL ledger for successful fetches
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, Write};
@@ -8,7 +9,7 @@ use std::path::Path;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LedgerEntry {
     pub url: String,
-    pub fetched_at: String,
+    pub fetched_at: DateTime<Utc>,
     pub file: String,
 }
 
@@ -46,12 +47,8 @@ pub fn is_duplicate<'a>(entries: &'a [LedgerEntry], url: &str) -> Option<&'a Led
 /// Append a single entry to the ledger file.
 /// Creates the file if it doesn't exist.
 pub fn append_entry(path: &Path, entry: &LedgerEntry) -> io::Result<()> {
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?;
-    let json = serde_json::to_string(entry)
-        .map_err(io::Error::other)?;
+    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+    let json = serde_json::to_string(entry).map_err(io::Error::other)?;
     writeln!(file, "{}", json)?;
     Ok(())
 }
@@ -64,7 +61,7 @@ mod tests {
     fn make_entry(url: &str, file: &str) -> LedgerEntry {
         LedgerEntry {
             url: url.to_string(),
-            fetched_at: "2025-01-15T09:32:00Z".to_string(),
+            fetched_at: "2025-01-15T09:32:00Z".parse().unwrap(),
             file: file.to_string(),
         }
     }
@@ -98,24 +95,22 @@ mod tests {
         // Verify each line is independently valid JSON
         let content = fs::read_to_string(&path).unwrap();
         for line in content.lines() {
-            assert!(serde_json::from_str::<LedgerEntry>(line).is_ok(),
-                "line is not valid JSON: {line}");
+            assert!(
+                serde_json::from_str::<LedgerEntry>(line).is_ok(),
+                "line is not valid JSON: {line}"
+            );
         }
     }
 
     #[test]
     fn duplicate_detection_exact_match() {
-        let entries = vec![
-            make_entry("https://example.com/article", "article.md"),
-        ];
+        let entries = vec![make_entry("https://example.com/article", "article.md")];
         assert!(is_duplicate(&entries, "https://example.com/article").is_some());
     }
 
     #[test]
     fn near_duplicate_not_detected() {
-        let entries = vec![
-            make_entry("https://example.com/article", "article.md"),
-        ];
+        let entries = vec![make_entry("https://example.com/article", "article.md")];
         assert!(is_duplicate(&entries, "https://example.com/article?ref=twitter").is_none());
     }
 
@@ -157,9 +152,7 @@ this is not json
     fn failed_url_not_in_ledger_can_resubmit() {
         // Only successful fetches go in the ledger.
         // A URL that failed previously should not be blocked.
-        let entries = vec![
-            make_entry("https://example.com/success", "success.md"),
-        ];
+        let entries = vec![make_entry("https://example.com/success", "success.md")];
         // A different URL that "failed" (never made it to ledger) is not blocked
         assert!(is_duplicate(&entries, "https://example.com/failed").is_none());
     }

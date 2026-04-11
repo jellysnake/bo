@@ -118,7 +118,10 @@ mod tests {
 
     #[test]
     fn basic_ascii_title() {
-        assert_eq!(slugify("Rust Ownership Explained", ""), "rust-ownership-explained");
+        assert_eq!(
+            slugify("Rust Ownership Explained", ""),
+            "rust-ownership-explained"
+        );
     }
 
     #[test]

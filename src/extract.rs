@@ -31,8 +31,7 @@ const MIN_CONTENT_LENGTH: usize = 50;
 /// Returns markdown body with links stripped to plain text.
 pub fn extract_content(html: &str) -> Result<ExtractedContent, ExtractError> {
     let opts = Options::default();
-    let result = extract(html, &opts)
-        .map_err(|e| ExtractError::ExtractionFailed(e.to_string()))?;
+    let result = extract(html, &opts).map_err(|e| ExtractError::ExtractionFailed(e.to_string()))?;
 
     let body = result.content_markdown();
 
@@ -154,7 +153,10 @@ mod tests {
 
     #[test]
     fn strip_simple_link() {
-        assert_eq!(strip_markdown_links("see [example](https://example.com) here"), "see example here");
+        assert_eq!(
+            strip_markdown_links("see [example](https://example.com) here"),
+            "see example here"
+        );
     }
 
     #[test]
