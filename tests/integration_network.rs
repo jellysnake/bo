@@ -8,12 +8,12 @@ use std::process::Command;
 use tempfile::TempDir;
 
 fn run_binary(url: &str, output_dir: &std::path::Path) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_link-stash"))
+    Command::new(env!("CARGO_BIN_EXE_bo"))
         .arg(url)
         .arg("--output-dir")
         .arg(output_dir)
         .output()
-        .expect("failed to run link-stash binary")
+        .expect("failed to run bo binary")
 }
 
 #[test]
