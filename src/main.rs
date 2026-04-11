@@ -1,13 +1,14 @@
 use bo::config::{self, Config, ConfigError};
 use bo::{extract, fetch, ledger, markdown, slug};
 
+use chrono::Utc;
 use clap::{Parser, Subcommand};
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process;
+use url::Url;
 
-const NOT_SEEDED_MSG: &str =
-    "bo hasn't been seeded yet — run: bo seed <output-dir>";
+const NOT_SEEDED_MSG: &str = "bo hasn't been seeded yet — run: bo seed <output-dir>";
 
 #[derive(Parser)]
 #[command(name = "bo", about = "Stash web pages as local markdown")]
@@ -74,8 +75,13 @@ fn cmd_seed(output_dir: PathBuf) -> Result<(), String> {
     std::fs::create_dir_all(&output_dir)
         .map_err(|e| format!("failed to create output directory: {}", e))?;
 
-    config::write_config(&Config { output_dir: output_dir.clone() }, &config::config_path())
-        .map_err(|e| format!("failed to write config: {}", e))?;
+    config::write_config(
+        &Config {
+            output_dir: output_dir.clone(),
+        },
+        &config::config_path(),
+    )
+    .map_err(|e| format!("failed to write config: {}", e))?;
 
     println!("seeded bo at {}", output_dir.display());
     Ok(())
@@ -87,13 +93,15 @@ fn cmd_add(url: String) -> Result<(), String> {
     let cfg = require_config()?;
     let output_dir = cfg.output_dir;
 
-    // Validate URL
-    if !url.starts_with("http://") && !url.starts_with("https://") {
+    // Validate URL — must be HTTP/HTTPS and parseable
+    let parsed_url = Url::parse(&url).map_err(|e| format!("invalid URL: {}", e))?;
+    if parsed_url.scheme() != "http" && parsed_url.scheme() != "https" {
         return Err(format!(
-            "invalid URL (must start with http:// or https://): {}",
-            url
+            "invalid URL scheme '{}': must be http or https",
+            parsed_url.scheme()
         ));
     }
+    let url = parsed_url.as_str().to_string();
 
     std::fs::create_dir_all(&output_dir)
         .map_err(|e| format!("failed to create output directory: {}", e))?;
@@ -101,16 +109,15 @@ fn cmd_add(url: String) -> Result<(), String> {
     let ledger_path = output_dir.join("ledger.jsonl");
 
     // Duplicate check
-    let entries = ledger::read_ledger(&ledger_path)
-        .map_err(|e| format!("failed to read ledger: {}", e))?;
+    let entries =
+        ledger::read_ledger(&ledger_path).map_err(|e| format!("failed to read ledger: {}", e))?;
     if let Some(existing) = ledger::is_duplicate(&entries, &url) {
         return Err(format!("already stashed: {} → {}", url, existing.file));
     }
 
     // Fetch
     eprintln!("fetching {}...", url);
-    let fetch_result =
-        fetch::fetch_url(&url).map_err(|e| format!("fetch failed: {}", e))?;
+    let fetch_result = fetch::fetch_url(&url).map_err(|e| format!("fetch failed: {}", e))?;
 
     // Extract
     let content = extract::extract_content(&fetch_result.html)
@@ -122,11 +129,12 @@ fn cmd_add(url: String) -> Result<(), String> {
     let filename = slug::resolve_slug(&base_slug, &url, &output_dir);
 
     // Write markdown
-    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let now = Utc::now();
+    let now_str = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let doc = markdown::format_document(
         content.title.as_deref(),
         &url,
-        &now,
+        &now_str,
         &content.body_markdown,
     );
     markdown::write_document(&output_dir, &filename, &doc)
@@ -135,7 +143,7 @@ fn cmd_add(url: String) -> Result<(), String> {
     // Ledger
     let entry = ledger::LedgerEntry {
         url: url.clone(),
-        fetched_at: chrono::Utc::now(),
+        fetched_at: now,
         file: format!("{}.md", filename),
     };
     ledger::append_entry(&ledger_path, &entry)
@@ -152,8 +160,8 @@ fn cmd_raze() -> Result<(), String> {
     let output_dir = cfg.output_dir;
 
     let ledger_path = output_dir.join("ledger.jsonl");
-    let entries = ledger::read_ledger(&ledger_path)
-        .map_err(|e| format!("failed to read ledger: {}", e))?;
+    let entries =
+        ledger::read_ledger(&ledger_path).map_err(|e| format!("failed to read ledger: {}", e))?;
 
     // Delete ledger-tracked markdown files
     let mut deleted = 0usize;
@@ -172,9 +180,7 @@ fn cmd_raze() -> Result<(), String> {
         match std::fs::remove_file(&resolved) {
             Ok(()) => deleted += 1,
             Err(e) if e.kind() == ErrorKind::NotFound => {} // already gone, fine
-            Err(e) => {
-                return Err(format!("failed to delete {}: {}", resolved.display(), e))
-            }
+            Err(e) => return Err(format!("failed to delete {}: {}", resolved.display(), e)),
         }
     }
     println!("deleted {} markdown file(s)", deleted);
@@ -189,10 +195,7 @@ fn cmd_raze() -> Result<(), String> {
     // Attempt to remove output dir (only succeeds if empty)
     match std::fs::remove_dir(&output_dir) {
         Ok(()) => println!("removed output directory {}", output_dir.display()),
-        Err(e)
-            if e.kind() == ErrorKind::DirectoryNotEmpty
-                || e.kind() == ErrorKind::NotFound =>
-        {
+        Err(e) if e.kind() == ErrorKind::DirectoryNotEmpty || e.kind() == ErrorKind::NotFound => {
             println!(
                 "output directory left in place (not empty or already absent): {}",
                 output_dir.display()
