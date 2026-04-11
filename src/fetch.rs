@@ -43,7 +43,7 @@ pub fn fetch_url(url: &str) -> Result<FetchResult, FetchError> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(30))
         .redirect(reqwest::redirect::Policy::limited(10))
-        .user_agent("link-stash/0.1")
+        .user_agent("bo/0.1")
         .build()
         .map_err(|e| FetchError::Network(e.to_string()))?;
 
