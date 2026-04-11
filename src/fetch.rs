@@ -43,7 +43,7 @@ pub fn fetch_url(url: &str) -> Result<FetchResult, FetchError> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(30))
         .redirect(reqwest::redirect::Policy::limited(10))
-        .user_agent("link-stash/0.1")
+        .user_agent("bo/0.1")
         .build()
         .map_err(|e| FetchError::Network(e.to_string()))?;
 
@@ -52,7 +52,12 @@ pub fn fetch_url(url: &str) -> Result<FetchResult, FetchError> {
     for attempt in 0..MAX_RETRIES {
         if attempt > 0 {
             let delay = Duration::from_secs(BACKOFF_BASE * (1 << (attempt - 1)));
-            eprintln!("  retry {}/{} in {}s...", attempt, MAX_RETRIES - 1, delay.as_secs());
+            eprintln!(
+                "  retry {}/{} in {}s...",
+                attempt,
+                MAX_RETRIES - 1,
+                delay.as_secs()
+            );
             thread::sleep(delay);
         }
 
@@ -99,7 +104,9 @@ fn try_fetch(client: &reqwest::blocking::Client, url: &str) -> Result<FetchResul
         return Err(FetchError::NotHtml(content_type.to_string()));
     }
 
-    let html = response.text().map_err(|e| FetchError::Network(e.to_string()))?;
+    let html = response
+        .text()
+        .map_err(|e| FetchError::Network(e.to_string()))?;
 
     Ok(FetchResult { html })
 }
@@ -133,7 +140,8 @@ mod tests {
     #[test]
     #[ignore]
     fn fetch_pdf_not_html() {
-        let result = fetch_url("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf");
+        let result =
+            fetch_url("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf");
         assert!(matches!(result, Err(FetchError::NotHtml(_))));
     }
 

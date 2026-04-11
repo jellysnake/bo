@@ -16,7 +16,8 @@ pub const SLUG_COLLISION_2: &str = "https://en.wiktionary.org/wiki/introduction"
 
 /// Near-duplicate URLs (same base, different query params)
 pub const NEAR_DUP_BASE: &str = "https://en.wikipedia.org/wiki/Rust_(programming_language)";
-pub const NEAR_DUP_VARIANT: &str = "https://en.wikipedia.org/wiki/Rust_(programming_language)?ref=twitter";
+pub const NEAR_DUP_VARIANT: &str =
+    "https://en.wikipedia.org/wiki/Rust_(programming_language)?ref=twitter";
 
 /// Paywalled / auth-gated
 pub const PAYWALLED: &str = "https://www.wsj.com/articles/some-premium-article-that-requires-login";
@@ -29,5 +30,6 @@ pub const DEAD_404: &str = "https://httpbin.org/status/404";
 pub const DEAD_500: &str = "https://httpbin.org/status/500";
 
 /// Non-HTML content
-pub const NON_HTML_PDF: &str = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+pub const NON_HTML_PDF: &str =
+    "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
 pub const NON_HTML_BINARY: &str = "https://httpbin.org/bytes/1024";
