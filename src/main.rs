@@ -1,12 +1,11 @@
 use bo::config::{self, Config, ConfigError};
-use bo::{extract, fetch, ledger, markdown, slug};
+use bo::ledger;
+use bo::pipeline;
 
-use chrono::Utc;
 use clap::{Parser, Subcommand};
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process;
-use url::Url;
 
 const NOT_SEEDED_MSG: &str = "bo hasn't been seeded yet — run: bo seed <output-dir>";
 
@@ -91,65 +90,10 @@ fn cmd_seed(output_dir: PathBuf) -> Result<(), String> {
 
 fn cmd_add(url: String) -> Result<(), String> {
     let cfg = require_config()?;
-    let output_dir = cfg.output_dir;
-
-    // Validate URL — must be HTTP/HTTPS and parseable
-    let parsed_url = Url::parse(&url).map_err(|e| format!("invalid URL: {}", e))?;
-    if parsed_url.scheme() != "http" && parsed_url.scheme() != "https" {
-        return Err(format!(
-            "invalid URL scheme '{}': must be http or https",
-            parsed_url.scheme()
-        ));
-    }
-    let url = parsed_url.as_str().to_string();
-
-    std::fs::create_dir_all(&output_dir)
-        .map_err(|e| format!("failed to create output directory: {}", e))?;
-
-    let ledger_path = output_dir.join("ledger.jsonl");
-
-    // Duplicate check
-    let entries =
-        ledger::read_ledger(&ledger_path).map_err(|e| format!("failed to read ledger: {}", e))?;
-    if let Some(existing) = ledger::is_duplicate(&entries, &url) {
-        return Err(format!("already stashed: {} → {}", url, existing.file));
-    }
-
-    // Fetch
+    // Progress feedback — kept here as a CLI concern, not moved to the library.
     eprintln!("fetching {}...", url);
-    let fetch_result = fetch::fetch_url(&url).map_err(|e| format!("fetch failed: {}", e))?;
-
-    // Extract
-    let content = extract::extract_content(&fetch_result.html)
-        .map_err(|e| format!("extraction failed: {}", e))?;
-
-    // Slug
-    let title_ref = content.title.as_deref().unwrap_or("");
-    let base_slug = slug::slugify(title_ref, &url);
-    let filename = slug::resolve_slug(&base_slug, &url, &output_dir);
-
-    // Write markdown
-    let now = Utc::now();
-    let now_str = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let doc = markdown::format_document(
-        content.title.as_deref(),
-        &url,
-        &now_str,
-        &content.body_markdown,
-    );
-    markdown::write_document(&output_dir, &filename, &doc)
-        .map_err(|e| format!("failed to write markdown: {}", e))?;
-
-    // Ledger
-    let entry = ledger::LedgerEntry {
-        url: url.clone(),
-        fetched_at: now,
-        file: format!("{}.md", filename),
-    };
-    ledger::append_entry(&ledger_path, &entry)
-        .map_err(|e| format!("failed to update ledger: {}", e))?;
-
-    println!("✓ stashed: {} → {}.md", url, filename);
+    let page = pipeline::stash_url(&url, &cfg.output_dir).map_err(|e| e.to_string())?;
+    println!("✓ stashed: {} → {}", page.url, page.filename);
     Ok(())
 }
 
@@ -217,6 +161,18 @@ fn cmd_raze() -> Result<(), String> {
 // ── main ─────────────────────────────────────────────────────────────────────
 
 fn main() {
+    // Initialise tracing. WARN+ shown by default; set RUST_LOG=debug for verbose output.
+    // Format is message-only (no timestamp/level prefix) to match the CLI's plain output style.
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive(tracing::Level::WARN.into()),
+        )
+        .with_target(false)
+        .without_time()
+        .with_level(false)
+        .init();
+
     let cli = Cli::parse();
     let result = match cli.command {
         Commands::Seed { output_dir } => cmd_seed(output_dir),

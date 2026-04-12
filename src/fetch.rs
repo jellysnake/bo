@@ -3,13 +3,20 @@
 use std::fmt;
 use std::thread;
 use std::time::Duration;
+use tracing::warn;
+use url::Url;
 
+/// The result of a successful HTTP fetch.
+/// `url` is the normalised (canonicalised) form of the requested URL.
 pub struct FetchResult {
+    pub url: String,
     pub html: String,
 }
 
 #[derive(Debug)]
 pub enum FetchError {
+    /// The URL could not be parsed or uses an unsupported scheme.
+    InvalidUrl(String),
     Network(String),
     HttpStatus(u16, String),
     NotHtml(String),
@@ -19,6 +26,7 @@ pub enum FetchError {
 impl fmt::Display for FetchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            FetchError::InvalidUrl(msg) => write!(f, "invalid URL: {}", msg),
             FetchError::Network(msg) => write!(f, "network error: {}", msg),
             FetchError::HttpStatus(code, msg) => write!(f, "HTTP {}: {}", code, msg),
             FetchError::NotHtml(ct) => write!(f, "not HTML (Content-Type: {})", ct),
@@ -32,6 +40,7 @@ const BACKOFF_BASE: u64 = 1; // seconds
 
 fn is_retryable(err: &FetchError) -> bool {
     match err {
+        FetchError::InvalidUrl(_) => false,
         FetchError::Timeout => true,
         FetchError::Network(_) => true,
         FetchError::HttpStatus(code, _) => *code >= 500,
@@ -40,6 +49,17 @@ fn is_retryable(err: &FetchError) -> bool {
 }
 
 pub fn fetch_url(url: &str) -> Result<FetchResult, FetchError> {
+    // Validate and normalise before any network attempt.
+    let parsed = Url::parse(url)
+        .map_err(|e| FetchError::InvalidUrl(format!("cannot parse '{}': {}", url, e)))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(FetchError::InvalidUrl(format!(
+            "scheme '{}' is not http or https",
+            parsed.scheme()
+        )));
+    }
+    let canonical_url = parsed.as_str().to_string();
+
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(30))
         .redirect(reqwest::redirect::Policy::limited(10))
@@ -50,25 +70,22 @@ pub fn fetch_url(url: &str) -> Result<FetchResult, FetchError> {
     let mut last_err = FetchError::Network("no attempts made".to_string());
 
     for attempt in 0..MAX_RETRIES {
-        if attempt > 0 {
-            let delay = Duration::from_secs(BACKOFF_BASE * (1 << (attempt - 1)));
-            eprintln!(
-                "  retry {}/{} in {}s...",
-                attempt,
-                MAX_RETRIES - 1,
-                delay.as_secs()
-            );
-            thread::sleep(delay);
-        }
-
-        match try_fetch(&client, url) {
-            Ok(result) => return Ok(result),
+        match try_fetch(&client, &canonical_url) {
+            Ok(html) => return Ok(FetchResult { url: canonical_url, html }),
             Err(e) => {
                 if !is_retryable(&e) {
                     return Err(e);
                 }
-                eprintln!("  attempt {}: {}", attempt + 1, e);
                 last_err = e;
+                let next = attempt + 1;
+                if next < MAX_RETRIES {
+                    let delay = Duration::from_secs(BACKOFF_BASE * (1 << attempt));
+                    warn!(
+                        "attempt {}/{} failed ({}), retrying in {}s",
+                        next, MAX_RETRIES, last_err, delay.as_secs()
+                    );
+                    thread::sleep(delay);
+                }
             }
         }
     }
@@ -76,7 +93,7 @@ pub fn fetch_url(url: &str) -> Result<FetchResult, FetchError> {
     Err(last_err)
 }
 
-fn try_fetch(client: &reqwest::blocking::Client, url: &str) -> Result<FetchResult, FetchError> {
+fn try_fetch(client: &reqwest::blocking::Client, url: &str) -> Result<String, FetchError> {
     let response = client.get(url).send().map_err(|e| {
         if e.is_timeout() {
             FetchError::Timeout
@@ -108,12 +125,26 @@ fn try_fetch(client: &reqwest::blocking::Client, url: &str) -> Result<FetchResul
         .text()
         .map_err(|e| FetchError::Network(e.to_string()))?;
 
-    Ok(FetchResult { html })
+    Ok(html)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore] // requires network
+    fn invalid_scheme_rejected() {
+        let result = fetch_url("ftp://example.com/file.txt");
+        assert!(matches!(result, Err(FetchError::InvalidUrl(_))));
+    }
+
+    #[test]
+    #[ignore] // requires network
+    fn unparseable_url_rejected() {
+        let result = fetch_url("not a url at all");
+        assert!(matches!(result, Err(FetchError::InvalidUrl(_))));
+    }
 
     #[test]
     #[ignore] // requires network
