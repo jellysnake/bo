@@ -3,6 +3,6 @@
 
 # dev
 .env
-/specs
+/ards
 /scratchpad
-
+/specs
