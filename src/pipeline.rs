@@ -32,7 +32,9 @@ pub struct StashedPage {
 #[derive(Debug)]
 pub enum StashError {
     /// The URL has already been stashed; contains the existing filename.
-    DuplicateUrl { existing_file: String },
+    DuplicateUrl {
+        existing_file: String,
+    },
     Fetch(fetch::FetchError),
     Extract(extract::ExtractError),
     Io(std::io::Error),
