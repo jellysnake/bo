@@ -27,8 +27,7 @@ const NEAR_DUP_VARIANT: &str =
     "https://en.wikipedia.org/wiki/Rust_(programming_language)?ref=twitter";
 
 /// Paywalled / auth-gated
-const PAYWALLED: &str =
-    "https://www.wsj.com/articles/some-premium-article-that-requires-login";
+const PAYWALLED: &str = "https://www.wsj.com/articles/some-premium-article-that-requires-login";
 
 /// JS-rendered SPA (React app)
 const JS_SPA: &str = "https://react.dev/learn";

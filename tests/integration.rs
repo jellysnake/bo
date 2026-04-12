@@ -61,8 +61,7 @@ fn duplicate_rejected() {
     bo::pipeline::stash_html("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
 
     // Second attempt with same URL should fail
-    let result =
-        bo::pipeline::stash_html("https://example.com/article", SAMPLE_HTML, dir.path());
+    let result = bo::pipeline::stash_html("https://example.com/article", SAMPLE_HTML, dir.path());
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("already stashed"));
 
