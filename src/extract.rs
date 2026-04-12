@@ -214,7 +214,10 @@ enough text to meet the minimum extraction threshold for quality filtering.</p>
         // The leading h1 (matching the title) is stripped from the body so
         // callers can add their own heading via format_document without duplication.
         assert!(
-            !result.body_markdown.trim_start().starts_with("# My Article"),
+            !result
+                .body_markdown
+                .trim_start()
+                .starts_with("# My Article"),
             "leading h1 matching title should be stripped from body, got: {}",
             result.body_markdown
         );
@@ -227,10 +230,7 @@ enough text to meet the minimum extraction threshold for quality filtering.</p>
         // title and body are returned for a normal article page.
         let result = extract_content(ARTICLE_DIFFERENT_H1).unwrap();
         assert!(result.title.is_some(), "title should be extracted");
-        assert!(
-            !result.body_markdown.is_empty(),
-            "body should be non-empty"
-        );
+        assert!(!result.body_markdown.is_empty(), "body should be non-empty");
         // Paragraph content should be present in the body regardless of how
         // trafilatura handles the heading.
         assert!(

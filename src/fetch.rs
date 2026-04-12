@@ -71,7 +71,12 @@ pub fn fetch_url(url: &str) -> Result<FetchResult, FetchError> {
 
     for attempt in 0..MAX_RETRIES {
         match try_fetch(&client, &canonical_url) {
-            Ok(html) => return Ok(FetchResult { url: canonical_url, html }),
+            Ok(html) => {
+                return Ok(FetchResult {
+                    url: canonical_url,
+                    html,
+                })
+            }
             Err(e) => {
                 if !is_retryable(&e) {
                     return Err(e);
@@ -82,7 +87,10 @@ pub fn fetch_url(url: &str) -> Result<FetchResult, FetchError> {
                     let delay = Duration::from_secs(BACKOFF_BASE * (1 << attempt));
                     warn!(
                         "attempt {}/{} failed ({}), retrying in {}s",
-                        next, MAX_RETRIES, last_err, delay.as_secs()
+                        next,
+                        MAX_RETRIES,
+                        last_err,
+                        delay.as_secs()
                     );
                     thread::sleep(delay);
                 }
@@ -133,14 +141,12 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore] // requires network
     fn invalid_scheme_rejected() {
         let result = fetch_url("ftp://example.com/file.txt");
         assert!(matches!(result, Err(FetchError::InvalidUrl(_))));
     }
 
     #[test]
-    #[ignore] // requires network
     fn unparseable_url_rejected() {
         let result = fetch_url("not a url at all");
         assert!(matches!(result, Err(FetchError::InvalidUrl(_))));
