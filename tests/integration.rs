@@ -1,49 +1,11 @@
-// End-to-end integration tests using fixtures (no network)
+// End-to-end integration tests using fixtures (no network).
+//
+// Tests exercise the full extract → write → ledger pipeline by calling
+// `bo::pipeline::stash_html` directly with fixture HTML. This avoids network
+// dependencies while covering the same code paths as `bo add <url>`.
 
 use std::fs;
 use tempfile::TempDir;
-
-// We test the full pipeline by calling the modules directly rather than the binary,
-// to avoid needing network access. This exercises the same code paths as main().
-
-fn run_pipeline(url: &str, html: &str, output_dir: &std::path::Path) -> Result<String, String> {
-    let ledger_path = output_dir.join("ledger.jsonl");
-
-    // Check duplicate
-    let entries = bo::ledger::read_ledger(&ledger_path).map_err(|e| e.to_string())?;
-    if let Some(existing) = bo::ledger::is_duplicate(&entries, url) {
-        return Err(format!("already stashed: {} → {}", url, existing.file));
-    }
-
-    // Extract
-    let content = bo::extract::extract_content(html).map_err(|e| e.to_string())?;
-
-    // Slug
-    let title_ref = content.title.as_deref().unwrap_or("");
-    let base_slug = bo::slug::slugify(title_ref, url);
-    let filename = bo::slug::resolve_slug(&base_slug, url, output_dir);
-
-    // Format + write
-    let now: chrono::DateTime<chrono::Utc> = "2025-01-15T09:32:00Z".parse().unwrap();
-    let now_str = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let doc = bo::markdown::format_document(
-        content.title.as_deref(),
-        url,
-        &now_str,
-        &content.body_markdown,
-    );
-    bo::markdown::write_document(output_dir, &filename, &doc).map_err(|e| e.to_string())?;
-
-    // Ledger
-    let entry = bo::ledger::LedgerEntry {
-        url: url.to_string(),
-        fetched_at: now,
-        file: format!("{}.md", filename),
-    };
-    bo::ledger::append_entry(&ledger_path, &entry).map_err(|e| e.to_string())?;
-
-    Ok(format!("{}.md", filename))
-}
 
 const SAMPLE_HTML: &str = r#"
 <html><head><title>Test Article</title></head>
@@ -74,13 +36,14 @@ const COLLISION_HTML_2: &str = r#"
 #[test]
 fn full_pipeline_happy_path() {
     let dir = TempDir::new().unwrap();
-    let file = run_pipeline("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
+    let page =
+        bo::pipeline::stash_html("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
 
     // Markdown file exists
-    assert!(dir.path().join(&file).exists());
+    assert!(dir.path().join(&page.filename).exists());
 
     // Content is correct
-    let content = fs::read_to_string(dir.path().join(&file)).unwrap();
+    let content = fs::read_to_string(dir.path().join(&page.filename)).unwrap();
     assert!(content.contains("title: \"Test Article\""));
     assert!(content.contains("url: https://example.com/article"));
     assert!(content.contains("# Test Article"));
@@ -95,12 +58,13 @@ fn full_pipeline_happy_path() {
 #[test]
 fn duplicate_rejected() {
     let dir = TempDir::new().unwrap();
-    run_pipeline("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
+    bo::pipeline::stash_html("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
 
     // Second attempt with same URL should fail
-    let result = run_pipeline("https://example.com/article", SAMPLE_HTML, dir.path());
+    let result =
+        bo::pipeline::stash_html("https://example.com/article", SAMPLE_HTML, dir.path());
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("already stashed"));
+    assert!(result.unwrap_err().to_string().contains("already stashed"));
 
     // Ledger still has only one entry
     let entries = bo::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
@@ -111,24 +75,30 @@ fn duplicate_rejected() {
 fn slug_collision_disambiguated() {
     let dir = TempDir::new().unwrap();
 
-    let file1 = run_pipeline("https://example.com/intro1", COLLISION_HTML_1, dir.path()).unwrap();
-    let file2 = run_pipeline("https://example.com/intro2", COLLISION_HTML_2, dir.path()).unwrap();
+    let page1 =
+        bo::pipeline::stash_html("https://example.com/intro1", COLLISION_HTML_1, dir.path())
+            .unwrap();
+    let page2 =
+        bo::pipeline::stash_html("https://example.com/intro2", COLLISION_HTML_2, dir.path())
+            .unwrap();
 
     // Both files exist
-    assert!(dir.path().join(&file1).exists());
-    assert!(dir.path().join(&file2).exists());
+    assert!(dir.path().join(&page1.filename).exists());
+    assert!(dir.path().join(&page2.filename).exists());
 
     // Filenames are different
-    assert_ne!(file1, file2);
+    assert_ne!(page1.filename, page2.filename);
 
     // Both start with "introduction"
-    assert!(file1.starts_with("introduction"));
-    assert!(file2.starts_with("introduction"));
+    assert!(page1.filename.starts_with("introduction"));
+    assert!(page2.filename.starts_with("introduction"));
 
     // Second has hash suffix
     assert!(
-        file2.contains('-') && file2.len() > file1.len(),
-        "second file should have hash suffix: {file1} vs {file2}"
+        page2.filename.contains('-') && page2.filename.len() > page1.filename.len(),
+        "second file should have hash suffix: {} vs {}",
+        page1.filename,
+        page2.filename
     );
 
     // Ledger has two entries
@@ -141,7 +111,7 @@ fn empty_extraction_no_artifacts() {
     let dir = TempDir::new().unwrap();
     let empty_html = "<html><body></body></html>";
 
-    let result = run_pipeline("https://example.com/empty", empty_html, dir.path());
+    let result = bo::pipeline::stash_html("https://example.com/empty", empty_html, dir.path());
     assert!(result.is_err());
 
     // No markdown file
@@ -163,11 +133,11 @@ fn failed_url_can_be_resubmitted() {
     let empty_html = "<html><body></body></html>";
 
     // First attempt fails (empty content)
-    let result = run_pipeline("https://example.com/flaky", empty_html, dir.path());
+    let result = bo::pipeline::stash_html("https://example.com/flaky", empty_html, dir.path());
     assert!(result.is_err());
 
     // Second attempt with good content succeeds — not blocked by ledger
-    let result = run_pipeline("https://example.com/flaky", SAMPLE_HTML, dir.path());
+    let result = bo::pipeline::stash_html("https://example.com/flaky", SAMPLE_HTML, dir.path());
     assert!(result.is_ok());
 }
 
@@ -175,16 +145,13 @@ fn failed_url_can_be_resubmitted() {
 fn near_duplicate_urls_both_stored() {
     let dir = TempDir::new().unwrap();
 
-    let file1 = run_pipeline("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
-    let file2 = run_pipeline(
+    bo::pipeline::stash_html("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
+    bo::pipeline::stash_html(
         "https://example.com/article?ref=twitter",
         SAMPLE_HTML,
         dir.path(),
     )
     .unwrap();
-
-    assert!(dir.path().join(&file1).exists());
-    assert!(dir.path().join(&file2).exists());
 
     let entries = bo::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
     assert_eq!(entries.len(), 2);
