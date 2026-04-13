@@ -451,6 +451,7 @@ the concepts it belongs to.
 use crate::agent::{AgentConfig, OpenAiProvider};
 use crate::config::Config;
 use crate::index;
+use crate::leaf;
 
 pub fn cmd_compile(cfg: &Config) -> Result<(), String> {
     // ── read index first (leaf count guard fires before API key check) ──────
@@ -481,17 +482,9 @@ pub fn cmd_compile(cfg: &Config) -> Result<(), String> {
 
     for entry in &all_entries {
         let leaf_path = cfg.output_dir.join(&entry.file);
-        let skip_reason = match fs::read_to_string(&leaf_path) {
-            Err(e) => Some(format!("I/O error: {}", e)),
-            Ok(content) => match frontmatter::parse(&content) {
-                Err(e) => Some(format!("frontmatter error: {}", e)),
-                Ok(_) => None,
-            },
-        };
-        if let Some(_reason) = skip_reason {
-            skipped_leaves.push(entry.file.clone());
-        } else {
-            valid_leaves.push(entry.clone());
+        match leaf::read_frontmatter(&leaf_path) {
+            Ok(_) => valid_leaves.push(entry.clone()),
+            Err(_) => skipped_leaves.push(entry.file.clone()),
         }
     }
 

@@ -15,7 +15,7 @@ use chrono::Utc;
 use std::fmt;
 use std::path::Path;
 
-use crate::{extract, fetch, index, markdown, slug};
+use crate::{extract, fetch, index, leaf, slug};
 
 // ── types ────────────────────────────────────────────────────────────────────
 
@@ -110,17 +110,18 @@ pub fn collect_html(url: &str, html: &str, output_dir: &Path) -> Result<Document
     let base_slug = slug::slugify(title_ref, url);
     let filename = slug::resolve_slug(&base_slug, url, output_dir);
 
-    // Write markdown
-    // `write_document` calls `create_dir_all` internally, ensuring `output_dir` exists
-    // before `append_entry` below requires the directory.
+    // Write leaf file.
+    // `leaf::write` calls `create_dir_all` internally, ensuring `output_dir`
+    // exists before `append_entry` below requires the directory.
     let now_str = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let doc = markdown::format_document(
+    let leaf_path = output_dir.join(format!("{}.md", filename));
+    leaf::write(
+        &leaf_path,
         content.title.as_deref(),
         url,
         &now_str,
         &content.body_markdown,
-    );
-    markdown::write_document(output_dir, &filename, &doc)?;
+    )?;
 
     // Index
     let entry = index::IndexEntry {
