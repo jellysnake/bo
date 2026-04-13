@@ -1,6 +1,6 @@
 use bo::config::{self, Config, ConfigError};
 use bo::index;
-use bo::pipeline;
+use bo::add;
 
 use clap::{Parser, Subcommand};
 use std::io::ErrorKind;
@@ -95,7 +95,7 @@ fn cmd_add(url: String) -> Result<(), String> {
     let cfg = require_config()?;
     // Progress feedback — kept here as a CLI concern, not moved to the library.
     eprintln!("fetching {}...", url);
-    let page = pipeline::collect_url(&url, &cfg.output_dir).map_err(|e| e.to_string())?;
+    let page = add::collect_url(&url, &cfg.output_dir).map_err(|e| e.to_string())?;
     println!("✓ collected: {} → {}", page.url, page.filename);
     Ok(())
 }

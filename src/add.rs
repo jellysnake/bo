@@ -1,15 +1,17 @@
-// Top-level pipeline — the engine's public API.
+// bo add — the collect pipeline.
 //
-// This is the only module a future consumer of the `bo` library needs to import
-// to collect content. It owns the orchestration of the underlying engine modules
-// (fetch, extract, slug, markdown, ledger) and exposes two entry points:
+// Orchestrates the full flow for `bo add <url>`: fetch HTML from the network,
+// extract readable content, write the leaf file, and append to the index.
+//
+// Two entry points:
 //
 //   collect_url(url, output_dir)        — full pipeline including network fetch
 //   collect_html(url, html, output_dir) — same, but accepts pre-fetched HTML
 //
-// `collect_html` is the testable core; `collect_url` is a thin wrapper that fetches first.
+// `collect_html` is the testable core; `collect_url` is a thin wrapper that
+// fetches first.
 //
-// Dependency direction: pipeline → fetch, extract, slug, markdown, ledger.
+// Dependency direction: add → fetch, extract, leaf, slug, index.
 
 use chrono::Utc;
 use std::fmt;
