@@ -1,7 +1,7 @@
 // End-to-end integration tests using fixtures (no network).
 //
 // Tests exercise the full extract → write → index pipeline by calling
-// `bo::pipeline::collect_html` directly with fixture HTML. This avoids network
+// `bo::collect::collect_html` directly with fixture HTML. This avoids network
 // dependencies while covering the same code paths as `bo add <url>`.
 
 use std::fs;
@@ -37,7 +37,7 @@ const COLLISION_HTML_2: &str = r#"
 fn full_pipeline_happy_path() {
     let dir = TempDir::new().unwrap();
     let page =
-        bo::pipeline::collect_html("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
+        bo::collect::collect_html("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
 
     // Markdown file exists
     assert!(dir.path().join(&page.filename).exists());
@@ -61,10 +61,10 @@ fn full_pipeline_happy_path() {
 #[test]
 fn duplicate_rejected() {
     let dir = TempDir::new().unwrap();
-    bo::pipeline::collect_html("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
+    bo::collect::collect_html("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
 
     // Second attempt with same URL should fail
-    let result = bo::pipeline::collect_html("https://example.com/article", SAMPLE_HTML, dir.path());
+    let result = bo::collect::collect_html("https://example.com/article", SAMPLE_HTML, dir.path());
     assert!(result.is_err());
     assert!(result
         .unwrap_err()
@@ -81,10 +81,10 @@ fn slug_collision_disambiguated() {
     let dir = TempDir::new().unwrap();
 
     let page1 =
-        bo::pipeline::collect_html("https://example.com/intro1", COLLISION_HTML_1, dir.path())
+        bo::collect::collect_html("https://example.com/intro1", COLLISION_HTML_1, dir.path())
             .unwrap();
     let page2 =
-        bo::pipeline::collect_html("https://example.com/intro2", COLLISION_HTML_2, dir.path())
+        bo::collect::collect_html("https://example.com/intro2", COLLISION_HTML_2, dir.path())
             .unwrap();
 
     // Both files exist
@@ -116,7 +116,7 @@ fn empty_extraction_no_artifacts() {
     let dir = TempDir::new().unwrap();
     let empty_html = "<html><body></body></html>";
 
-    let result = bo::pipeline::collect_html("https://example.com/empty", empty_html, dir.path());
+    let result = bo::collect::collect_html("https://example.com/empty", empty_html, dir.path());
     assert!(result.is_err());
 
     // No markdown file
@@ -138,11 +138,11 @@ fn failed_url_can_be_resubmitted() {
     let empty_html = "<html><body></body></html>";
 
     // First attempt fails (empty content)
-    let result = bo::pipeline::collect_html("https://example.com/flaky", empty_html, dir.path());
+    let result = bo::collect::collect_html("https://example.com/flaky", empty_html, dir.path());
     assert!(result.is_err());
 
     // Second attempt with good content succeeds — not blocked by index
-    let result = bo::pipeline::collect_html("https://example.com/flaky", SAMPLE_HTML, dir.path());
+    let result = bo::collect::collect_html("https://example.com/flaky", SAMPLE_HTML, dir.path());
     assert!(result.is_ok());
 }
 
@@ -150,8 +150,8 @@ fn failed_url_can_be_resubmitted() {
 fn near_duplicate_urls_both_stored() {
     let dir = TempDir::new().unwrap();
 
-    bo::pipeline::collect_html("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
-    bo::pipeline::collect_html(
+    bo::collect::collect_html("https://example.com/article", SAMPLE_HTML, dir.path()).unwrap();
+    bo::collect::collect_html(
         "https://example.com/article?ref=twitter",
         SAMPLE_HTML,
         dir.path(),
