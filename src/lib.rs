@@ -10,10 +10,10 @@
 //!
 //! ```ignore
 //! // Full pipeline including network fetch:
-//! bo::pipeline::stash_url(url, output_dir)
+//! bo::pipeline::collect_url(url, output_dir)
 //!
 //! // Extract-write-ledger pipeline with pre-fetched HTML (useful for testing):
-//! bo::pipeline::stash_html(url, html, output_dir)
+//! bo::pipeline::collect_html(url, html, output_dir)
 //! ```
 //!
 //! ## Module dependency direction

@@ -1,8 +1,8 @@
 // Integration tests that require network access.
 // Run with: cargo test --test integration_network -- --ignored --nocapture
 //
-// Each test seeds bo with a temp output dir, exercises the binary, then razes.
-// Tests are sequential (all #[ignore]) — do not run in parallel.
+// Each test creates its own HOME and stash TempDir so tests are fully isolated
+// and safe to run in parallel.
 
 // ── test URLs ────────────────────────────────────────────────────────────────
 
@@ -46,13 +46,15 @@ use std::path::Path;
 use std::process::{Command, Output};
 use tempfile::TempDir;
 
-fn bo() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_bo"))
+fn bo(home: &Path) -> Command {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_bo"));
+    cmd.env("HOME", home);
+    cmd
 }
 
-fn seed(dir: &Path) {
-    let out = bo()
-        .args(["seed", dir.to_str().unwrap()])
+fn seed(home: &Path, output_dir: &Path) {
+    let out = bo(home)
+        .args(["seed", output_dir.to_str().unwrap()])
         .output()
         .expect("failed to run bo seed");
     assert!(
@@ -62,14 +64,15 @@ fn seed(dir: &Path) {
     );
 }
 
-fn add(url: &str) -> Output {
-    bo().args(["add", url])
+fn add(home: &Path, url: &str) -> Output {
+    bo(home)
+        .args(["add", url])
         .output()
         .expect("failed to run bo add")
 }
 
-fn raze() {
-    let _ = bo().arg("raze").output();
+fn raze(home: &Path) {
+    let _ = bo(home).arg("raze").output();
 }
 
 // ── tests ────────────────────────────────────────────────────────────────────
@@ -77,10 +80,11 @@ fn raze() {
 #[test]
 #[ignore]
 fn network_happy_path_wikipedia() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out = add(ARTICLE_WIKIPEDIA_2);
+    let out = add(home.path(), ARTICLE_WIKIPEDIA_2);
     assert!(
         out.status.success(),
         "stderr: {}",
@@ -88,7 +92,7 @@ fn network_happy_path_wikipedia() {
     );
 
     // At least one .md file exists
-    let md_files: Vec<_> = fs::read_dir(dir.path())
+    let md_files: Vec<_> = fs::read_dir(&stash)
         .unwrap()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
@@ -96,42 +100,76 @@ fn network_happy_path_wikipedia() {
     assert_eq!(md_files.len(), 1);
 
     // Ledger has one entry
-    let ledger = fs::read_to_string(dir.path().join("ledger.jsonl")).unwrap();
+    let ledger = fs::read_to_string(stash.join("ledger.jsonl")).unwrap();
     assert_eq!(ledger.lines().count(), 1);
 
-    raze();
+    raze(home.path());
+}
+
+#[test]
+#[ignore]
+fn network_happy_path_bodhi() {
+    // Jaya Sri Maha Bodhi was the original problem URL: link-heavy tables,
+    // reference markers, and a heading that matches the page title.
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
+
+    let out = add(home.path(), ARTICLE_WIKIPEDIA_1);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let md_file = fs::read_dir(&stash)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .find(|e| e.path().extension().is_some_and(|ext| ext == "md"))
+        .unwrap();
+    let content = fs::read_to_string(md_file.path()).unwrap();
+
+    // No markdown links should survive extraction
+    assert!(
+        !content.contains("](http"),
+        "output contains markdown links"
+    );
+
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_happy_path_blog() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out = add(ARTICLE_BLOG);
+    let out = add(home.path(), ARTICLE_BLOG);
     assert!(
         out.status.success(),
         "stderr: {}",
         String::from_utf8_lossy(&out.stderr)
     );
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_very_long_page() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out = add(VERY_LONG);
+    let out = add(home.path(), VERY_LONG);
     assert!(
         out.status.success(),
         "stderr: {}",
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let md_files: Vec<_> = fs::read_dir(dir.path())
+    let md_files: Vec<_> = fs::read_dir(&stash)
         .unwrap()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
@@ -143,95 +181,100 @@ fn network_very_long_page() {
         content.len()
     );
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_404_fails_gracefully() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out = add(DEAD_404);
+    let out = add(home.path(), DEAD_404);
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("404"), "stderr: {stderr}");
 
     // No markdown file, no ledger
-    let md_files: Vec<_> = fs::read_dir(dir.path())
+    let md_files: Vec<_> = fs::read_dir(&stash)
         .unwrap()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
         .collect();
     assert!(md_files.is_empty());
-    assert!(!dir.path().join("ledger.jsonl").exists());
+    assert!(!stash.join("ledger.jsonl").exists());
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_pdf_fails_gracefully() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out = add(NON_HTML_PDF);
+    let out = add(home.path(), NON_HTML_PDF);
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("not HTML"), "stderr: {stderr}");
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_duplicate_rejected() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out1 = add(ARTICLE_WIKIPEDIA_2);
+    let out1 = add(home.path(), ARTICLE_WIKIPEDIA_2);
     assert!(out1.status.success());
 
-    let out2 = add(ARTICLE_WIKIPEDIA_2);
+    let out2 = add(home.path(), ARTICLE_WIKIPEDIA_2);
     assert!(!out2.status.success());
     let stderr = String::from_utf8_lossy(&out2.stderr);
-    assert!(stderr.contains("already stashed"), "stderr: {stderr}");
+    assert!(stderr.contains("already collected"), "stderr: {stderr}");
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_near_duplicate_urls_both_stored() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out1 = add(NEAR_DUP_BASE);
+    let out1 = add(home.path(), NEAR_DUP_BASE);
     assert!(out1.status.success());
 
-    let out2 = add(NEAR_DUP_VARIANT);
+    let out2 = add(home.path(), NEAR_DUP_VARIANT);
     assert!(out2.status.success());
 
-    let ledger = fs::read_to_string(dir.path().join("ledger.jsonl")).unwrap();
+    let ledger = fs::read_to_string(stash.join("ledger.jsonl")).unwrap();
     assert_eq!(ledger.lines().count(), 2);
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_link_heavy_page() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out = add(LINK_HEAVY);
+    let out = add(home.path(), LINK_HEAVY);
     assert!(
         out.status.success(),
         "stderr: {}",
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let md_file = fs::read_dir(dir.path())
+    let md_file = fs::read_dir(&stash)
         .unwrap()
         .filter_map(|e| e.ok())
         .find(|e| e.path().extension().is_some_and(|ext| ext == "md"))
@@ -242,49 +285,51 @@ fn network_link_heavy_page() {
         "output still contains markdown links"
     );
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_slug_collision_pair() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out1 = add(SLUG_COLLISION_1);
+    let out1 = add(home.path(), SLUG_COLLISION_1);
     assert!(
         out1.status.success(),
         "stderr: {}",
         String::from_utf8_lossy(&out1.stderr)
     );
 
-    let out2 = add(SLUG_COLLISION_2);
+    let out2 = add(home.path(), SLUG_COLLISION_2);
     assert!(
         out2.status.success(),
         "stderr: {}",
         String::from_utf8_lossy(&out2.stderr)
     );
 
-    let ledger = fs::read_to_string(dir.path().join("ledger.jsonl")).unwrap();
+    let ledger = fs::read_to_string(stash.join("ledger.jsonl")).unwrap();
     assert_eq!(ledger.lines().count(), 2);
 
-    let md_files: Vec<_> = fs::read_dir(dir.path())
+    let md_files: Vec<_> = fs::read_dir(&stash)
         .unwrap()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
         .collect();
     assert_eq!(md_files.len(), 2);
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_500_retries_then_fails() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out = add(DEAD_500);
+    let out = add(home.path(), DEAD_500);
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
@@ -292,47 +337,50 @@ fn network_500_retries_then_fails() {
         "stderr: {stderr}"
     );
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_binary_content_fails() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out = add(NON_HTML_BINARY);
+    let out = add(home.path(), NON_HTML_BINARY);
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("not HTML"), "stderr: {stderr}");
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_paywalled_degrades_gracefully() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out = add(PAYWALLED);
+    let out = add(home.path(), PAYWALLED);
     // May succeed with partial content or fail — either is acceptable
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!stderr.contains("panic"), "binary panicked: {stderr}");
 
-    raze();
+    raze(home.path());
 }
 
 #[test]
 #[ignore]
 fn network_js_spa_degrades_gracefully() {
-    let dir = TempDir::new().unwrap();
-    seed(dir.path());
+    let home = TempDir::new().unwrap();
+    let stash = home.path().join("stash");
+    seed(home.path(), &stash);
 
-    let out = add(JS_SPA);
+    let out = add(home.path(), JS_SPA);
     // SPA may return some server-rendered content or fail extraction
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!stderr.contains("panic"), "binary panicked: {stderr}");
 
-    raze();
+    raze(home.path());
 }
