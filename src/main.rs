@@ -28,6 +28,8 @@ enum Commands {
         /// URL to fetch and stash
         url: String,
     },
+    /// Compile collected documents into a linked knowledge graph
+    Compile,
     /// Delete all bo-managed files and config
     Raze,
 }
@@ -77,6 +79,7 @@ fn cmd_seed(output_dir: PathBuf) -> Result<(), String> {
     config::write_config(
         &Config {
             output_dir: output_dir.clone(),
+            compile_model: None,
         },
         &config::config_path(),
     )
@@ -177,6 +180,7 @@ fn main() {
     let result = match cli.command {
         Commands::Seed { output_dir } => cmd_seed(output_dir),
         Commands::Add { url } => cmd_add(url),
+        Commands::Compile => require_config().and_then(|cfg| bo::compile::cmd_compile(&cfg)),
         Commands::Raze => cmd_raze(),
     };
     if let Err(e) = result {

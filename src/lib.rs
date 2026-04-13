@@ -35,9 +35,13 @@
 //!
 //! See `adrs/adr-001.md` for the full rationale behind these structural decisions.
 
+pub mod agent;
+pub mod branch;
+pub mod compile;
 pub mod config;
 pub mod extract;
 pub mod fetch;
+pub mod frontmatter;
 pub mod index;
 pub mod markdown;
 pub mod pipeline;

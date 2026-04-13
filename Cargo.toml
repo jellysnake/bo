@@ -20,5 +20,10 @@ clap = { version = "4", features = ["derive"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+async-openai = { version = "0.34", features = ["chat-completion"] }
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt", "macros"] }
+serde_yaml_ng = "0.10"
+
 [dev-dependencies]
 tempfile = "3"
