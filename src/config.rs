@@ -13,6 +13,17 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub output_dir: PathBuf,
+
+    /// Model used by `bo compile`. Defaults to "gpt-4o" when absent.
+    /// Set by editing ~/.bo/config.json directly.
+    #[serde(default)]
+    pub compile_model: Option<String>,
+}
+
+impl Config {
+    pub fn effective_compile_model(&self) -> &str {
+        self.compile_model.as_deref().unwrap_or("gpt-4o")
+    }
 }
 
 #[derive(Debug)]
@@ -75,6 +86,7 @@ mod tests {
 
         let config = Config {
             output_dir: PathBuf::from("/tmp/my-stash"),
+            compile_model: None,
         };
         write_config(&config, &path).unwrap();
 
@@ -89,6 +101,7 @@ mod tests {
 
         let config = Config {
             output_dir: PathBuf::from("/some/path"),
+            compile_model: None,
         };
         write_config(&config, &path).unwrap();
 
@@ -116,5 +129,44 @@ mod tests {
 
         let err = read_config(&path).unwrap_err();
         assert!(matches!(err, ConfigError::Parse(_)));
+    }
+
+    #[test]
+    fn compile_model_roundtrip_with_value() {
+        let dir = TempDir::new().unwrap();
+        let path = temp_config_path(&dir);
+
+        let config = Config {
+            output_dir: PathBuf::from("/tmp/bo"),
+            compile_model: Some("gpt-4o-mini".to_string()),
+        };
+        write_config(&config, &path).unwrap();
+
+        let loaded = read_config(&path).unwrap();
+        assert_eq!(loaded.compile_model.as_deref(), Some("gpt-4o-mini"));
+        assert_eq!(loaded.effective_compile_model(), "gpt-4o-mini");
+    }
+
+    #[test]
+    fn compile_model_absent_uses_default() {
+        let dir = TempDir::new().unwrap();
+        let path = temp_config_path(&dir);
+
+        // Write JSON without compile_model field (simulates existing config file)
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, r#"{"output_dir":"/tmp/bo"}"#).unwrap();
+
+        let loaded = read_config(&path).unwrap();
+        assert!(loaded.compile_model.is_none());
+        assert_eq!(loaded.effective_compile_model(), "gpt-4o");
+    }
+
+    #[test]
+    fn effective_compile_model_returns_stored_value_when_set() {
+        let cfg = Config {
+            output_dir: PathBuf::from("/tmp/bo"),
+            compile_model: Some("claude-3-5-sonnet".to_string()),
+        };
+        assert_eq!(cfg.effective_compile_model(), "claude-3-5-sonnet");
     }
 }

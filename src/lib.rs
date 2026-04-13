@@ -18,27 +18,35 @@
 //!
 //! ## Module dependency direction
 //!
-//! Dependencies flow inward. The CLI layer (`main.rs`) calls into `pipeline`;
-//! `pipeline` orchestrates the engine modules; engine modules have no
-//! dependencies on each other or on CLI code.
+//! Dependencies flow inward. The CLI layer (`main.rs`) calls into `pipeline`
+//! and `compile`; those modules orchestrate the engine modules below them.
 //!
 //! ```text
 //! main.rs  (CLI: arg parsing, output, dispatch)
-//!   ├── config  (read directly by main; not used by pipeline)
-//!   └── pipeline  (orchestration — the engine's public API)
-//!         ├── fetch
-//!         ├── extract
+//!   ├── config      (read directly by main)
+//!   ├── collect     (bo collect — orchestrates fetch → extract → leaf → index)
+//!   │     ├── fetch
+//!   │     ├── extract
+//!   │     ├── leaf
+//!   │     ├── slug
+//!   │     └── index
+//!   └── compile     (bo compile — agent loop + tools)
+//!         ├── agent
+//!         ├── branch
+//!         ├── leaf
+//!         ├── frontmatter
 //!         ├── slug
-//!         ├── markdown
 //!         └── index
 //! ```
-//!
-//! See `adrs/adr-001.md` for the full rationale behind these structural decisions.
 
+pub mod agent;
+pub mod branch;
+pub mod compile;
 pub mod config;
 pub mod extract;
 pub mod fetch;
+pub mod frontmatter;
 pub mod index;
-pub mod markdown;
-pub mod pipeline;
+pub mod leaf;
+pub mod collect;
 pub mod slug;
