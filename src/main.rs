@@ -1,6 +1,6 @@
 use bo::config::{self, Config, ConfigError};
 use bo::index;
-use bo::add;
+use bo::collect;
 
 use clap::{Parser, Subcommand};
 use std::io::ErrorKind;
@@ -24,8 +24,8 @@ enum Commands {
         output_dir: PathBuf,
     },
     /// Fetch a URL and collect it
-    Add {
-        /// URL to fetch and stash
+    Collect {
+        /// URL to collect
         url: String,
     },
     /// Compile collected documents into a linked knowledge graph
@@ -91,11 +91,10 @@ fn cmd_seed(output_dir: PathBuf) -> Result<(), String> {
 
 // ── cmd_add ──────────────────────────────────────────────────────────────────
 
-fn cmd_add(url: String) -> Result<(), String> {
+fn cmd_collect(url: String) -> Result<(), String> {
     let cfg = require_config()?;
-    // Progress feedback — kept here as a CLI concern, not moved to the library.
     eprintln!("fetching {}...", url);
-    let page = add::collect_url(&url, &cfg.output_dir).map_err(|e| e.to_string())?;
+    let page = collect::collect_url(&url, &cfg.output_dir).map_err(|e| e.to_string())?;
     println!("✓ collected: {} → {}", page.url, page.filename);
     Ok(())
 }
@@ -179,7 +178,7 @@ fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
         Commands::Seed { output_dir } => cmd_seed(output_dir),
-        Commands::Add { url } => cmd_add(url),
+        Commands::Collect { url } => cmd_collect(url),
         Commands::Compile => require_config().and_then(|cfg| bo::compile::cmd_compile(&cfg)),
         Commands::Raze => cmd_raze(),
     };
