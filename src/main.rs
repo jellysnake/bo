@@ -23,7 +23,7 @@ enum Commands {
         /// Directory to store stashed content
         output_dir: PathBuf,
     },
-    /// Fetch a URL and add it to the stash
+    /// Fetch a URL and collect it
     Add {
         /// URL to fetch and stash
         url: String,
@@ -92,8 +92,8 @@ fn cmd_add(url: String) -> Result<(), String> {
     let cfg = require_config()?;
     // Progress feedback — kept here as a CLI concern, not moved to the library.
     eprintln!("fetching {}...", url);
-    let page = pipeline::stash_url(&url, &cfg.output_dir).map_err(|e| e.to_string())?;
-    println!("✓ stashed: {} → {}", page.url, page.filename);
+    let page = pipeline::collect_url(&url, &cfg.output_dir).map_err(|e| e.to_string())?;
+    println!("✓ collected: {} → {}", page.url, page.filename);
     Ok(())
 }
 
