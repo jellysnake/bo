@@ -30,7 +30,7 @@
 //!         ├── extract
 //!         ├── slug
 //!         ├── markdown
-//!         └── ledger
+//!         └── index
 //! ```
 //!
 //! See `adrs/adr-001.md` for the full rationale behind these structural decisions.
@@ -38,7 +38,7 @@
 pub mod config;
 pub mod extract;
 pub mod fetch;
-pub mod ledger;
+pub mod index;
 pub mod markdown;
 pub mod pipeline;
 pub mod slug;
