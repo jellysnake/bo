@@ -1,7 +1,8 @@
-// bo add — the collect pipeline.
+// bo collect — the collect pipeline.
 //
-// Orchestrates the full flow for `bo add <url>`: fetch HTML from the network,
-// extract readable content, write the leaf file, and append to the index.
+// Orchestrates the full flow for `bo collect <url>`: fetch HTML from the
+// network, extract readable content, write the leaf file, and append to
+// the index.
 //
 // Two entry points:
 //
@@ -11,7 +12,7 @@
 // `collect_html` is the testable core; `collect_url` is a thin wrapper that
 // fetches first.
 //
-// Dependency direction: add → fetch, extract, leaf, slug, index.
+// Dependency direction: collect → fetch, extract, leaf, slug, index.
 
 use chrono::Utc;
 use std::fmt;
