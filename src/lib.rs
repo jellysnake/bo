@@ -48,5 +48,5 @@ pub mod fetch;
 pub mod frontmatter;
 pub mod index;
 pub mod leaf;
-pub mod pipeline;
+pub mod add;
 pub mod slug;
