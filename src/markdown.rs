@@ -5,7 +5,7 @@ use std::io;
 use std::path::Path;
 
 /// Format a markdown document with YAML frontmatter.
-pub fn format_document(title: Option<&str>, url: &str, fetched_at: &str, body: &str) -> String {
+pub fn format_document(title: Option<&str>, url: &str, collected_at: &str, body: &str) -> String {
     let title_yaml = match title {
         Some(t) => format!("\"{}\"", t.replace('\\', "\\\\").replace('"', "\\\"")),
         None => "\"\"".to_string(),
@@ -15,7 +15,8 @@ pub fn format_document(title: Option<&str>, url: &str, fetched_at: &str, body: &
     doc.push_str("---\n");
     doc.push_str(&format!("title: {}\n", title_yaml));
     doc.push_str(&format!("url: {}\n", url));
-    doc.push_str(&format!("fetched: {}\n", fetched_at));
+    doc.push_str(&format!("collected_at: {}\n", collected_at));
+    doc.push_str(&format!("updated_at: {}\n", collected_at));
     doc.push_str("---\n\n");
 
     if let Some(t) = title {
@@ -51,7 +52,9 @@ mod tests {
         assert!(doc.starts_with("---\n"));
         assert!(doc.contains("title: \"My Article\""));
         assert!(doc.contains("url: https://example.com"));
-        assert!(doc.contains("fetched: 2025-01-15T09:32:00Z"));
+        assert!(doc.contains("collected_at: 2025-01-15T09:32:00Z"));
+        assert!(doc.contains("updated_at: 2025-01-15T09:32:00Z"));
+        assert!(!doc.contains("fetched:"));
         assert!(doc.contains("# My Article"));
         assert!(doc.contains("Some content here."));
     }

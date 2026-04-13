@@ -1,6 +1,6 @@
 // End-to-end integration tests using fixtures (no network).
 //
-// Tests exercise the full extract → write → ledger pipeline by calling
+// Tests exercise the full extract → write → index pipeline by calling
 // `bo::pipeline::collect_html` directly with fixture HTML. This avoids network
 // dependencies while covering the same code paths as `bo add <url>`.
 
@@ -46,11 +46,14 @@ fn full_pipeline_happy_path() {
     let content = fs::read_to_string(dir.path().join(&page.filename)).unwrap();
     assert!(content.contains("title: \"Test Article\""));
     assert!(content.contains("url: https://example.com/article"));
+    assert!(content.contains("collected_at:"));
+    assert!(content.contains("updated_at:"));
+    assert!(!content.contains("fetched:"));
     assert!(content.contains("# Test Article"));
     assert!(content.contains("Section One"));
 
-    // Ledger has one entry
-    let entries = bo::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
+    // Index has one entry
+    let entries = bo::index::read_index(&dir.path().join("index.jsonl")).unwrap();
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].url, "https://example.com/article");
 }
@@ -68,8 +71,8 @@ fn duplicate_rejected() {
         .to_string()
         .contains("already collected"));
 
-    // Ledger still has only one entry
-    let entries = bo::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
+    // Index still has only one entry
+    let entries = bo::index::read_index(&dir.path().join("index.jsonl")).unwrap();
     assert_eq!(entries.len(), 1);
 }
 
@@ -103,8 +106,8 @@ fn slug_collision_disambiguated() {
         page2.filename
     );
 
-    // Ledger has two entries
-    let entries = bo::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
+    // Index has two entries
+    let entries = bo::index::read_index(&dir.path().join("index.jsonl")).unwrap();
     assert_eq!(entries.len(), 2);
 }
 
@@ -124,9 +127,9 @@ fn empty_extraction_no_artifacts() {
         .collect();
     assert!(md_files.is_empty());
 
-    // No ledger entry
-    let ledger_path = dir.path().join("ledger.jsonl");
-    assert!(!ledger_path.exists() || fs::read_to_string(&ledger_path).unwrap().is_empty());
+    // No index entry
+    let index_path = dir.path().join("index.jsonl");
+    assert!(!index_path.exists() || fs::read_to_string(&index_path).unwrap().is_empty());
 }
 
 #[test]
@@ -138,7 +141,7 @@ fn failed_url_can_be_resubmitted() {
     let result = bo::pipeline::collect_html("https://example.com/flaky", empty_html, dir.path());
     assert!(result.is_err());
 
-    // Second attempt with good content succeeds — not blocked by ledger
+    // Second attempt with good content succeeds — not blocked by index
     let result = bo::pipeline::collect_html("https://example.com/flaky", SAMPLE_HTML, dir.path());
     assert!(result.is_ok());
 }
@@ -155,6 +158,6 @@ fn near_duplicate_urls_both_stored() {
     )
     .unwrap();
 
-    let entries = bo::ledger::read_ledger(&dir.path().join("ledger.jsonl")).unwrap();
+    let entries = bo::index::read_index(&dir.path().join("index.jsonl")).unwrap();
     assert_eq!(entries.len(), 2);
 }

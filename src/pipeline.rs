@@ -15,7 +15,7 @@ use chrono::Utc;
 use std::fmt;
 use std::path::Path;
 
-use crate::{extract, fetch, ledger, markdown, slug};
+use crate::{extract, fetch, index, markdown, slug};
 
 // ── types ────────────────────────────────────────────────────────────────────
 
@@ -91,11 +91,12 @@ pub fn collect_url(url: &str, output_dir: &Path) -> Result<Document, CollectErro
 /// This is the testable core of the pipeline: integration tests call it directly
 /// with fixture HTML to avoid network dependencies.
 pub fn collect_html(url: &str, html: &str, output_dir: &Path) -> Result<Document, CollectError> {
-    let ledger_path = output_dir.join("ledger.jsonl");
+    let index_path = output_dir.join("index.jsonl");
 
-    // Duplicate check
-    let entries = ledger::read_ledger(&ledger_path)?;
-    if let Some(existing) = ledger::is_duplicate(&entries, url) {
+    // Duplicate check — reads index only (fast path).
+    // If index.jsonl is absent, the URL is treated as new.
+    let entries = index::read_index(&index_path)?;
+    if let Some(existing) = index::is_duplicate(&entries, url) {
         return Err(CollectError::DuplicateUrl {
             existing_file: existing.file.clone(),
         });
@@ -112,8 +113,7 @@ pub fn collect_html(url: &str, html: &str, output_dir: &Path) -> Result<Document
     // Write markdown
     // `write_document` calls `create_dir_all` internally, ensuring `output_dir` exists
     // before `append_entry` below requires the directory.
-    let now = Utc::now();
-    let now_str = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let now_str = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let doc = markdown::format_document(
         content.title.as_deref(),
         url,
@@ -122,13 +122,13 @@ pub fn collect_html(url: &str, html: &str, output_dir: &Path) -> Result<Document
     );
     markdown::write_document(output_dir, &filename, &doc)?;
 
-    // Ledger
-    let entry = ledger::LedgerEntry {
-        url: url.to_string(),
-        fetched_at: now,
+    // Index
+    let entry = index::IndexEntry {
         file: format!("{}.md", filename),
+        title: content.title.clone().unwrap_or_default(),
+        url: url.to_string(),
     };
-    ledger::append_entry(&ledger_path, &entry)?;
+    index::append_entry(&index_path, &entry)?;
 
     Ok(Document {
         url: url.to_string(),
