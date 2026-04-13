@@ -66,7 +66,7 @@ fn seed(home: &Path, output_dir: &Path) {
 
 fn add(home: &Path, url: &str) -> Output {
     bo(home)
-        .args(["add", url])
+        .args(["collect", url])
         .output()
         .expect("failed to run bo add")
 }
