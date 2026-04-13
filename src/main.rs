@@ -1,5 +1,5 @@
 use bo::config::{self, Config, ConfigError};
-use bo::ledger;
+use bo::index;
 use bo::pipeline;
 
 use clap::{Parser, Subcommand};
@@ -103,9 +103,9 @@ fn cmd_raze() -> Result<(), String> {
     let cfg = require_config()?;
     let output_dir = cfg.output_dir;
 
-    let ledger_path = output_dir.join("ledger.jsonl");
+    let index_path = output_dir.join("index.jsonl");
     let entries =
-        ledger::read_ledger(&ledger_path).map_err(|e| format!("failed to read ledger: {}", e))?;
+        index::read_index(&index_path).map_err(|e| format!("failed to read index: {}", e))?;
 
     // Delete ledger-tracked markdown files
     let mut deleted = 0usize;
@@ -129,9 +129,9 @@ fn cmd_raze() -> Result<(), String> {
     }
     println!("deleted {} markdown file(s)", deleted);
 
-    // Delete ledger
-    match std::fs::remove_file(&ledger_path) {
-        Ok(()) => println!("deleted ledger"),
+    // Delete index
+    match std::fs::remove_file(&index_path) {
+        Ok(()) => println!("deleted index"),
         Err(e) if e.kind() == ErrorKind::NotFound => {}
         Err(e) => return Err(format!("failed to delete ledger: {}", e)),
     }

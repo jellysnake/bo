@@ -109,16 +109,16 @@ fn raze_removes_config_and_cleans_stash() {
     seed(home.path(), &stash);
     assert!(config_path(&home).exists());
 
-    // Manually write a stash file and ledger entry so raze has something to delete
+    // Manually write a stash file and index entry so raze has something to delete
     fs::create_dir_all(&stash).unwrap();
     fs::write(stash.join("article.md"), "# Article").unwrap();
     let entry = serde_json::json!({
-        "url": "https://example.com/article",
-        "fetched_at": "2025-01-15T09:32:00Z",
-        "file": "article.md"
+        "file": "article.md",
+        "title": "Article",
+        "url": "https://example.com/article"
     });
     fs::write(
-        stash.join("ledger.jsonl"),
+        stash.join("index.jsonl"),
         serde_json::to_string(&entry).unwrap(),
     )
     .unwrap();
@@ -133,9 +133,9 @@ fn raze_removes_config_and_cleans_stash() {
     // Config deleted
     assert!(!config_path(&home).exists());
 
-    // Stash file and ledger deleted
+    // Stash file and index deleted
     assert!(!stash.join("article.md").exists());
-    assert!(!stash.join("ledger.jsonl").exists());
+    assert!(!stash.join("index.jsonl").exists());
 }
 
 #[test]
@@ -161,12 +161,12 @@ fn raze_tolerates_already_deleted_files() {
     // Ledger references a file that doesn't exist on disk
     fs::create_dir_all(&stash).unwrap();
     let entry = serde_json::json!({
-        "url": "https://example.com/gone",
-        "fetched_at": "2025-01-15T09:32:00Z",
-        "file": "gone.md"
+        "file": "gone.md",
+        "title": "Gone",
+        "url": "https://example.com/gone"
     });
     fs::write(
-        stash.join("ledger.jsonl"),
+        stash.join("index.jsonl"),
         serde_json::to_string(&entry).unwrap(),
     )
     .unwrap();
