@@ -24,7 +24,7 @@
 //! ```text
 //! main.rs  (CLI: arg parsing, output, dispatch)
 //!   ├── config      (read directly by main)
-//!   ├── pipeline    (bo add — orchestrates fetch → extract → leaf → index)
+//!   ├── collect     (bo collect — orchestrates fetch → extract → leaf → index)
 //!   │     ├── fetch
 //!   │     ├── extract
 //!   │     ├── leaf
@@ -48,5 +48,5 @@ pub mod fetch;
 pub mod frontmatter;
 pub mod index;
 pub mod leaf;
-pub mod add;
+pub mod collect;
 pub mod slug;

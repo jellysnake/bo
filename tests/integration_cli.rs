@@ -82,11 +82,11 @@ fn seed_already_seeded_is_idempotent() {
 }
 
 #[test]
-fn add_without_seed_fails_with_helpful_message() {
+fn collect_without_seed_fails_with_helpful_message() {
     let home = TempDir::new().unwrap();
 
     let out = bo(home.path())
-        .args(["add", "https://example.com"])
+        .args(["collect", "https://example.com"])
         .output()
         .unwrap();
 
