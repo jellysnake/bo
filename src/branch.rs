@@ -52,12 +52,7 @@ pub fn write(
         Value::String(updated_at.to_string()),
     );
 
-    let leaves_seq = Value::Sequence(
-        leaves
-            .iter()
-            .map(|l| Value::String(l.clone()))
-            .collect(),
-    );
+    let leaves_seq = Value::Sequence(leaves.iter().map(|l| Value::String(l.clone())).collect());
     frontmatter::set_field(&mut mapping, "leaves", leaves_seq);
 
     // Ensure body starts with the correct heading
@@ -137,8 +132,15 @@ mod tests {
         let path = dir.path().join("branches").join("test-concept.md");
         assert!(!path.parent().unwrap().exists());
 
-        write(&path, "T", "body\n", &[], "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z")
-            .unwrap();
+        write(
+            &path,
+            "T",
+            "body\n",
+            &[],
+            "2025-01-01T00:00:00Z",
+            "2025-01-01T00:00:00Z",
+        )
+        .unwrap();
         assert!(path.exists());
     }
 
@@ -192,7 +194,12 @@ mod tests {
     #[test]
     fn read_compiled_at_returns_value_from_existing_file() {
         let dir = TempDir::new().unwrap();
-        write_test_branch(&dir, "concept", "2025-06-01T12:00:00Z", "2025-06-01T12:00:00Z");
+        write_test_branch(
+            &dir,
+            "concept",
+            "2025-06-01T12:00:00Z",
+            "2025-06-01T12:00:00Z",
+        );
         let path = dir.path().join("concept.md");
         assert_eq!(
             read_compiled_at(&path).as_deref(),

@@ -4,18 +4,54 @@
 // All public functions accept an explicit path so callers (and tests) can
 // redirect without touching global state.  Use config_path() to get the
 // default location.
+//
+// Shape of config.json:
+//
+//   {
+//     "compile_model": "gpt-4o",   // operator-level: spans all trees
+//     "tree": {                     // active tree metadata
+//       "output_dir": "/path/to/tree",
+//       "name": "my-research",
+//       "created_at": "2026-04-14T09:00:00Z"
+//     }
+//   }
+//
+// Top-level keys are operator/global settings.  Tree-specific fields live
+// under "tree" so the boundary is explicit and multi-tree support can extend
+// the shape without touching the global keys.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 
+// ── TreeConfig ─────────────────────────────────────────────────────────────────────
+
+/// Serialised metadata for the active tree, stored under the `"tree"` key
+/// in `config.json`.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
+pub struct TreeConfig {
     pub output_dir: PathBuf,
 
-    /// Model used by `bo compile`. Defaults to "gpt-4o" when absent.
-    /// Set by editing ~/.bo/config.json directly.
+    /// Human-readable name for the tree. Derived from the output directory
+    /// basename at seed time, or supplied via `bo seed --name`.
+    #[serde(default)]
+    pub name: Option<String>,
+
+    /// ISO 8601 UTC timestamp recorded when `bo seed` first ran.
+    #[serde(default)]
+    pub created_at: Option<String>,
+}
+
+// ── Config ──────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Config {
+    /// Active tree metadata.
+    pub tree: TreeConfig,
+
+    /// Model used by `bo compile`. Operator-level: applies across all trees.
+    /// Defaults to "gpt-4o" when absent.
     #[serde(default)]
     pub compile_model: Option<String>,
 }
@@ -79,35 +115,38 @@ mod tests {
         dir.path().join(".bo").join("config.json")
     }
 
+    fn make_config(output_dir: &str) -> Config {
+        Config {
+            tree: TreeConfig {
+                output_dir: PathBuf::from(output_dir),
+                name: None,
+                created_at: None,
+            },
+            compile_model: None,
+        }
+    }
+
     #[test]
     fn write_then_read_roundtrip() {
         let dir = TempDir::new().unwrap();
         let path = temp_config_path(&dir);
 
-        let config = Config {
-            output_dir: PathBuf::from("/tmp/my-stash"),
-            compile_model: None,
-        };
-        write_config(&config, &path).unwrap();
+        write_config(&make_config("/tmp/my-stash"), &path).unwrap();
 
         let loaded = read_config(&path).unwrap();
-        assert_eq!(loaded.output_dir, PathBuf::from("/tmp/my-stash"));
+        assert_eq!(loaded.tree.output_dir, PathBuf::from("/tmp/my-stash"));
     }
 
     #[test]
-    fn written_file_is_valid_json_with_output_dir() {
+    fn written_file_is_valid_json_with_tree_key() {
         let dir = TempDir::new().unwrap();
         let path = temp_config_path(&dir);
 
-        let config = Config {
-            output_dir: PathBuf::from("/some/path"),
-            compile_model: None,
-        };
-        write_config(&config, &path).unwrap();
+        write_config(&make_config("/some/path"), &path).unwrap();
 
         let contents = std::fs::read_to_string(&path).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&contents).unwrap();
-        assert_eq!(parsed["output_dir"], "/some/path");
+        assert_eq!(parsed["tree"]["output_dir"], "/some/path");
     }
 
     #[test]
@@ -137,7 +176,11 @@ mod tests {
         let path = temp_config_path(&dir);
 
         let config = Config {
-            output_dir: PathBuf::from("/tmp/bo"),
+            tree: TreeConfig {
+                output_dir: PathBuf::from("/tmp/bo"),
+                name: None,
+                created_at: None,
+            },
             compile_model: Some("gpt-4o-mini".to_string()),
         };
         write_config(&config, &path).unwrap();
@@ -148,13 +191,36 @@ mod tests {
     }
 
     #[test]
+    fn name_and_created_at_roundtrip() {
+        let dir = TempDir::new().unwrap();
+        let path = temp_config_path(&dir);
+
+        let config = Config {
+            tree: TreeConfig {
+                output_dir: PathBuf::from("/tmp/bo"),
+                name: Some("my-research".to_string()),
+                created_at: Some("2026-04-14T09:00:00Z".to_string()),
+            },
+            compile_model: None,
+        };
+        write_config(&config, &path).unwrap();
+
+        let loaded = read_config(&path).unwrap();
+        assert_eq!(loaded.tree.name.as_deref(), Some("my-research"));
+        assert_eq!(
+            loaded.tree.created_at.as_deref(),
+            Some("2026-04-14T09:00:00Z")
+        );
+    }
+
+    #[test]
     fn compile_model_absent_uses_default() {
         let dir = TempDir::new().unwrap();
         let path = temp_config_path(&dir);
 
-        // Write JSON without compile_model field (simulates existing config file)
+        // Write JSON without compile_model field
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(&path, r#"{"output_dir":"/tmp/bo"}"#).unwrap();
+        std::fs::write(&path, r#"{"tree":{"output_dir":"/tmp/bo"}}"#).unwrap();
 
         let loaded = read_config(&path).unwrap();
         assert!(loaded.compile_model.is_none());
@@ -164,7 +230,11 @@ mod tests {
     #[test]
     fn effective_compile_model_returns_stored_value_when_set() {
         let cfg = Config {
-            output_dir: PathBuf::from("/tmp/bo"),
+            tree: TreeConfig {
+                output_dir: PathBuf::from("/tmp/bo"),
+                name: None,
+                created_at: None,
+            },
             compile_model: Some("claude-3-5-sonnet".to_string()),
         };
         assert_eq!(cfg.effective_compile_model(), "claude-3-5-sonnet");

@@ -177,7 +177,14 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("sub").join("dir").join("article.md");
 
-        write(&path, None, "https://example.com", "2025-01-01T00:00:00Z", "content").unwrap();
+        write(
+            &path,
+            None,
+            "https://example.com",
+            "2025-01-01T00:00:00Z",
+            "content",
+        )
+        .unwrap();
 
         assert!(path.exists());
     }
@@ -187,7 +194,14 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("article.md");
 
-        write(&path, None, "https://example.com", "2025-01-01T00:00:00Z", "no newline").unwrap();
+        write(
+            &path,
+            None,
+            "https://example.com",
+            "2025-01-01T00:00:00Z",
+            "no newline",
+        )
+        .unwrap();
 
         let content = fs::read_to_string(&path).unwrap();
         assert!(content.ends_with('\n'));
@@ -261,6 +275,9 @@ mod tests {
         let path = dir.path().join("plain.md");
         fs::write(&path, "# Just markdown\n\nNo frontmatter.\n").unwrap();
         let err = read_frontmatter(&path).unwrap_err();
-        assert!(matches!(err, LeafError::Frontmatter(FrontmatterError::Missing)));
+        assert!(matches!(
+            err,
+            LeafError::Frontmatter(FrontmatterError::Missing)
+        ));
     }
 }

@@ -49,8 +49,8 @@ impl fmt::Display for FrontmatterError {
 /// separator line stripped (so `body` starts directly with content).
 pub fn parse(content: &str) -> Result<(Mapping, String), FrontmatterError> {
     let (yaml_str, body) = split_yaml_and_body(content)?;
-    let mapping: Mapping = serde_yaml_ng::from_str(yaml_str)
-        .map_err(|e| FrontmatterError::Parse(e.to_string()))?;
+    let mapping: Mapping =
+        serde_yaml_ng::from_str(yaml_str).map_err(|e| FrontmatterError::Parse(e.to_string()))?;
     Ok((mapping, body.to_string()))
 }
 
@@ -140,9 +140,7 @@ pub fn patch_fields(
                 seq_found[idx] = true;
                 lines.remove(i);
                 // Remove subsequent indented continuation lines
-                while i < lines.len()
-                    && (lines[i].starts_with(' ') || lines[i].starts_with('\t'))
-                {
+                while i < lines.len() && (lines[i].starts_with(' ') || lines[i].starts_with('\t')) {
                     lines.remove(i);
                 }
                 break;
@@ -194,7 +192,7 @@ fn split_yaml_and_body(content: &str) -> Result<(&str, &str), FrontmatterError> 
 
     let yaml_str = &rest[..close_pos + 1];
     let after = &rest[close_pos + 5..]; // skip \n---\n
-    // Strip optional blank separator line to get the body
+                                        // Strip optional blank separator line to get the body
     let body = after.strip_prefix('\n').unwrap_or(after);
 
     Ok((yaml_str, body))
@@ -251,9 +249,7 @@ Body.
     fn parse_returns_mapping_and_body() {
         let (mapping, body) = parse(SIMPLE_DOC).unwrap();
         assert_eq!(
-            mapping
-                .get("title")
-                .and_then(|v| v.as_str()),
+            mapping.get("title").and_then(|v| v.as_str()),
             Some("Simple Title")
         );
         assert!(body.contains("Body content here."));
@@ -279,7 +275,11 @@ Body.
     fn render_produces_valid_document() {
         let mut m = Mapping::new();
         set_field(&mut m, "title", Value::String("My Branch".into()));
-        set_field(&mut m, "compiled_at", Value::String("2025-01-01T00:00:00Z".into()));
+        set_field(
+            &mut m,
+            "compiled_at",
+            Value::String("2025-01-01T00:00:00Z".into()),
+        );
 
         let doc = render(&m, "# My Branch\n\nBody.\n");
         assert!(doc.starts_with("---\n"));
@@ -291,7 +291,11 @@ Body.
     fn render_round_trips_through_parse() {
         let mut m = Mapping::new();
         set_field(&mut m, "title", Value::String("Test".into()));
-        set_field(&mut m, "compiled_at", Value::String("2025-01-01T00:00:00Z".into()));
+        set_field(
+            &mut m,
+            "compiled_at",
+            Value::String("2025-01-01T00:00:00Z".into()),
+        );
         set_field(
             &mut m,
             "leaves",
@@ -374,23 +378,15 @@ Body.
 
     #[test]
     fn patch_fields_appends_new_sequence_field() {
-        let result = patch_fields(
-            SIMPLE_DOC,
-            &[],
-            &[("branches", &["concept-a".to_string()])],
-        )
-        .unwrap();
+        let result =
+            patch_fields(SIMPLE_DOC, &[], &[("branches", &["concept-a".to_string()])]).unwrap();
         assert!(result.contains("branches:\n  - concept-a"));
     }
 
     #[test]
     fn patch_fields_writes_empty_sequence_as_inline() {
-        let result = patch_fields(
-            DOC_WITH_BRANCHES,
-            &[],
-            &[("branches", &[] as &[String])],
-        )
-        .unwrap();
+        let result =
+            patch_fields(DOC_WITH_BRANCHES, &[], &[("branches", &[] as &[String])]).unwrap();
         assert!(result.contains("branches: []"));
     }
 

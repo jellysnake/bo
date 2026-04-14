@@ -256,8 +256,13 @@ impl Tool for WriteBranchTool {
 
         let (branches_dir, run_ts, valid_filenames) = {
             let ctx = self.ctx.lock().unwrap();
-            let filenames: HashSet<String> = ctx.valid_leaves.iter().map(|e| e.file.clone()).collect();
-            (ctx.branches_dir.clone(), ctx.run_timestamp.clone(), filenames)
+            let filenames: HashSet<String> =
+                ctx.valid_leaves.iter().map(|e| e.file.clone()).collect();
+            (
+                ctx.branches_dir.clone(),
+                ctx.run_timestamp.clone(),
+                filenames,
+            )
         };
 
         // Validate leaves — filter out invented filenames
@@ -278,8 +283,7 @@ impl Tool for WriteBranchTool {
         let branch_path = branches_dir.join(format!("{}.md", branch_slug));
 
         // Preserve compiled_at if this branch already exists
-        let compiled_at = branch::read_compiled_at(&branch_path)
-            .unwrap_or_else(|| run_ts.clone());
+        let compiled_at = branch::read_compiled_at(&branch_path).unwrap_or_else(|| run_ts.clone());
 
         if let Err(e) = branch::write(
             &branch_path,
@@ -289,7 +293,10 @@ impl Tool for WriteBranchTool {
             &compiled_at,
             &run_ts,
         ) {
-            return Ok(format!("error: could not write branch '{}': {}", branch_slug, e));
+            return Ok(format!(
+                "error: could not write branch '{}': {}",
+                branch_slug, e
+            ));
         }
 
         {
@@ -395,7 +402,12 @@ impl Tool for UpdateLeafFrontmatterTool {
             &[("branches", &branches)],
         ) {
             Ok(s) => s,
-            Err(e) => return Ok(format!("error: could not patch frontmatter of '{}': {}", filename, e)),
+            Err(e) => {
+                return Ok(format!(
+                    "error: could not patch frontmatter of '{}': {}",
+                    filename, e
+                ))
+            }
         };
 
         if let Err(e) = fs::write(&resolved, &updated) {
@@ -452,12 +464,13 @@ use crate::agent::{AgentConfig, OpenAiProvider};
 use crate::config::Config;
 use crate::index;
 use crate::leaf;
+use crate::tree::Tree;
 
 pub fn cmd_compile(cfg: &Config) -> Result<(), String> {
     // ── read index first (leaf count guard fires before API key check) ──────
-    let index_path = cfg.output_dir.join("index.jsonl");
-    let all_entries = index::read_index(&index_path)
-        .map_err(|e| format!("failed to read index: {}", e))?;
+    let index_path = cfg.tree.output_dir.join("index.jsonl");
+    let all_entries =
+        index::read_index(&index_path).map_err(|e| format!("failed to read index: {}", e))?;
 
     match all_entries.len() {
         0 => {
@@ -472,8 +485,9 @@ pub fn cmd_compile(cfg: &Config) -> Result<(), String> {
     }
 
     // ── check OPENAI_API_KEY ─────────────────────────────────────────────────
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| "OPENAI_API_KEY is not set — bo compile requires an OpenAI API key".to_string())?;
+    let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| {
+        "OPENAI_API_KEY is not set — bo compile requires an OpenAI API key".to_string()
+    })?;
 
     // ── validate leaves ───────────────────────────────────────────────────────
     let run_timestamp = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
@@ -481,7 +495,7 @@ pub fn cmd_compile(cfg: &Config) -> Result<(), String> {
     let mut skipped_leaves: Vec<String> = Vec::new();
 
     for entry in &all_entries {
-        let leaf_path = cfg.output_dir.join(&entry.file);
+        let leaf_path = cfg.tree.output_dir.join(&entry.file);
         match leaf::read_frontmatter(&leaf_path) {
             Ok(_) => valid_leaves.push(entry.clone()),
             Err(_) => skipped_leaves.push(entry.file.clone()),
@@ -495,12 +509,12 @@ pub fn cmd_compile(cfg: &Config) -> Result<(), String> {
         ));
     }
 
-    let branches_dir = cfg.output_dir.join("branches");
+    let branches_dir = Tree::from_config(&cfg.tree).branches_dir();
     let n_valid = valid_leaves.len();
 
     // ── build context and agent config ───────────────────────────────────────
     let ctx = Arc::new(Mutex::new(CompileContext {
-        output_dir: cfg.output_dir.clone(),
+        output_dir: cfg.tree.output_dir.clone(),
         branches_dir,
         run_timestamp,
         valid_leaves,
@@ -588,7 +602,11 @@ pub fn print_summary(summary: &CompileSummary) {
         println!(
             "compiled: {} {} across {} leaves",
             summary.branches.len(),
-            if summary.branches.len() == 1 { "branch" } else { "branches" },
+            if summary.branches.len() == 1 {
+                "branch"
+            } else {
+                "branches"
+            },
             summary.leaves_updated
         );
         for b in &summary.branches {
@@ -606,7 +624,11 @@ pub fn print_summary(summary: &CompileSummary) {
         println!(
             "  ⚠ skipped {} {} (unparseable frontmatter):",
             summary.leaves_skipped.len(),
-            if summary.leaves_skipped.len() == 1 { "leaf" } else { "leaves" }
+            if summary.leaves_skipped.len() == 1 {
+                "leaf"
+            } else {
+                "leaves"
+            }
         );
         for f in &summary.leaves_skipped {
             println!("    - {}", f);
@@ -695,7 +717,10 @@ mod tests {
         write_leaf(&dir, "leaf-a.md", "Leaf A");
         let ctx = make_ctx(&dir);
         let tool = ReadLeafTool::new(ctx);
-        let result = tool.execute(json!({"filename": "leaf-a.md"})).await.unwrap();
+        let result = tool
+            .execute(json!({"filename": "leaf-a.md"}))
+            .await
+            .unwrap();
         assert!(result.contains("Leaf A"));
     }
 

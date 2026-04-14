@@ -207,9 +207,8 @@ use async_openai::{
     types::chat::{
         ChatCompletionMessageToolCalls, ChatCompletionRequestAssistantMessageArgs,
         ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
-        ChatCompletionRequestToolMessage, ChatCompletionRequestUserMessageArgs,
-        ChatCompletionTool, ChatCompletionTools, CreateChatCompletionRequestArgs,
-        FunctionObjectArgs,
+        ChatCompletionRequestToolMessage, ChatCompletionRequestUserMessageArgs, ChatCompletionTool,
+        ChatCompletionTools, CreateChatCompletionRequestArgs, FunctionObjectArgs,
     },
     Client,
 };

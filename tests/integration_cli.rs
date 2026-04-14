@@ -54,7 +54,7 @@ fn seed_creates_output_dir_and_config() {
     assert!(cfg_path.exists());
     let contents = fs::read_to_string(&cfg_path).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&contents).unwrap();
-    assert_eq!(parsed["output_dir"], stash.to_str().unwrap());
+    assert_eq!(parsed["tree"]["output_dir"], stash.to_str().unwrap());
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn seed_already_seeded_is_idempotent() {
     let cfg_path = config_path(&home);
     let contents = fs::read_to_string(&cfg_path).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&contents).unwrap();
-    assert_eq!(parsed["output_dir"], stash.to_str().unwrap());
+    assert_eq!(parsed["tree"]["output_dir"], stash.to_str().unwrap());
 }
 
 #[test]
