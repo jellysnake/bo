@@ -15,8 +15,7 @@ use bo::index;
 /// Copy the fixture collection into a temp directory and return the path.
 fn setup_fixture_collection() -> tempfile::TempDir {
     let dir = tempfile::TempDir::new().unwrap();
-    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/compile");
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/compile");
 
     for entry in fs::read_dir(&fixtures).unwrap() {
         let entry = entry.unwrap();
@@ -29,7 +28,11 @@ fn setup_fixture_collection() -> tempfile::TempDir {
 
 fn make_config(output_dir: &std::path::Path) -> Config {
     Config {
-        output_dir: output_dir.to_path_buf(),
+        tree: bo::config::TreeConfig {
+            output_dir: output_dir.to_path_buf(),
+            name: None,
+            created_at: None,
+        },
         compile_model: Some("gpt-4o-mini".to_string()), // cheaper model for tests
     }
 }
@@ -80,7 +83,10 @@ fn compile_produces_at_least_one_branch_file() {
         "branch missing 'title' in frontmatter"
     );
     assert!(
-        mapping.get("compiled_at").and_then(|v| v.as_str()).is_some(),
+        mapping
+            .get("compiled_at")
+            .and_then(|v| v.as_str())
+            .is_some(),
         "branch missing 'compiled_at' in frontmatter"
     );
     assert!(
@@ -123,13 +129,11 @@ fn compile_does_not_modify_index_jsonl() {
     let dir = setup_fixture_collection();
     let cfg = make_config(dir.path());
 
-    let index_before =
-        fs::read_to_string(dir.path().join("index.jsonl")).unwrap();
+    let index_before = fs::read_to_string(dir.path().join("index.jsonl")).unwrap();
 
     compile::cmd_compile(&cfg).unwrap();
 
-    let index_after =
-        fs::read_to_string(dir.path().join("index.jsonl")).unwrap();
+    let index_after = fs::read_to_string(dir.path().join("index.jsonl")).unwrap();
     assert_eq!(
         index_before, index_after,
         "index.jsonl was modified by bo compile"
