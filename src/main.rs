@@ -1,7 +1,8 @@
+use bo::collect;
 use bo::config::{self, Config, ConfigError};
 use bo::index;
-use bo::collect;
 
+use chrono::Utc;
 use clap::{Parser, Subcommand};
 use std::io::ErrorKind;
 use std::path::PathBuf;
@@ -22,6 +23,9 @@ enum Commands {
     Seed {
         /// Directory to store stashed content
         output_dir: PathBuf,
+        /// Human-readable name for the tree (defaults to the output directory basename)
+        #[arg(long)]
+        name: Option<String>,
     },
     /// Fetch a URL and collect it
     Collect {
@@ -50,7 +54,7 @@ fn require_config() -> Result<Config, String> {
 
 // ── cmd_seed ─────────────────────────────────────────────────────────────────
 
-fn cmd_seed(output_dir: PathBuf) -> Result<(), String> {
+fn cmd_seed(output_dir: PathBuf, name: Option<String>) -> Result<(), String> {
     // Resolve to absolute path
     let output_dir = if output_dir.is_absolute() {
         output_dir
@@ -65,7 +69,7 @@ fn cmd_seed(output_dir: PathBuf) -> Result<(), String> {
         Ok(existing) => {
             println!(
                 "bo has already been seeded at {}!",
-                existing.output_dir.display()
+                existing.tree.output_dir.display()
             );
             return Ok(());
         }
@@ -76,9 +80,22 @@ fn cmd_seed(output_dir: PathBuf) -> Result<(), String> {
     std::fs::create_dir_all(&output_dir)
         .map_err(|e| format!("failed to create output directory: {}", e))?;
 
+    // Derive tree name from dir basename when --name is not provided
+    let tree_name = name.or_else(|| {
+        output_dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+    });
+
+    let created_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+
     config::write_config(
         &Config {
-            output_dir: output_dir.clone(),
+            tree: bo::config::TreeConfig {
+                output_dir: output_dir.clone(),
+                name: tree_name,
+                created_at: Some(created_at),
+            },
             compile_model: None,
         },
         &config::config_path(),
@@ -94,7 +111,7 @@ fn cmd_seed(output_dir: PathBuf) -> Result<(), String> {
 fn cmd_collect(url: String) -> Result<(), String> {
     let cfg = require_config()?;
     eprintln!("fetching {}...", url);
-    let page = collect::collect_url(&url, &cfg.output_dir).map_err(|e| e.to_string())?;
+    let page = collect::collect_url(&url, &cfg.tree.output_dir).map_err(|e| e.to_string())?;
     println!("✓ collected: {} → {}", page.url, page.filename);
     Ok(())
 }
@@ -103,7 +120,7 @@ fn cmd_collect(url: String) -> Result<(), String> {
 
 fn cmd_raze() -> Result<(), String> {
     let cfg = require_config()?;
-    let output_dir = cfg.output_dir;
+    let output_dir = cfg.tree.output_dir;
 
     let index_path = output_dir.join("index.jsonl");
     let entries =
@@ -177,7 +194,7 @@ fn main() {
 
     let cli = Cli::parse();
     let result = match cli.command {
-        Commands::Seed { output_dir } => cmd_seed(output_dir),
+        Commands::Seed { output_dir, name } => cmd_seed(output_dir, name),
         Commands::Collect { url } => cmd_collect(url),
         Commands::Compile => require_config().and_then(|cfg| bo::compile::cmd_compile(&cfg)),
         Commands::Raze => cmd_raze(),
@@ -185,5 +202,74 @@ fn main() {
     if let Err(e) = result {
         eprintln!("error: {}", e);
         process::exit(1);
+    }
+}
+
+// ── tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bo::config;
+    use std::sync::Mutex;
+    use tempfile::TempDir;
+
+    // Tests that mutate the HOME env var must run serially.
+    static HOME_LOCK: Mutex<()> = Mutex::new(());
+
+    /// Run cmd_seed with HOME redirected to a temp directory.
+    fn seed_with_home(
+        home: &TempDir,
+        output_dir: PathBuf,
+        name: Option<String>,
+    ) -> Result<(), String> {
+        let _guard = HOME_LOCK.lock().unwrap();
+        std::env::set_var("HOME", home.path());
+        cmd_seed(output_dir, name)
+    }
+
+    #[test]
+    fn seed_writes_name_derived_from_dir_basename() {
+        let home = TempDir::new().unwrap();
+        let output = TempDir::new().unwrap();
+        let output_dir = output.path().join("my-tree");
+
+        seed_with_home(&home, output_dir, None).unwrap();
+
+        let cfg_path = home.path().join(".bo").join("config.json");
+        let cfg = config::read_config(&cfg_path).unwrap();
+        assert_eq!(cfg.tree.name.as_deref(), Some("my-tree"));
+        assert!(cfg.tree.created_at.is_some());
+    }
+
+    #[test]
+    fn seed_uses_explicit_name_flag() {
+        let home = TempDir::new().unwrap();
+        let output = TempDir::new().unwrap();
+        let output_dir = output.path().join("some-dir");
+
+        seed_with_home(&home, output_dir, Some("explicit-name".to_string())).unwrap();
+
+        let cfg_path = home.path().join(".bo").join("config.json");
+        let cfg = config::read_config(&cfg_path).unwrap();
+        assert_eq!(cfg.tree.name.as_deref(), Some("explicit-name"));
+    }
+
+    #[test]
+    fn seed_already_seeded_is_idempotent() {
+        let home = TempDir::new().unwrap();
+        let output = TempDir::new().unwrap();
+        let output_dir = output.path().join("my-tree");
+        let cfg_path = home.path().join(".bo").join("config.json");
+
+        // First seed
+        seed_with_home(&home, output_dir.clone(), None).unwrap();
+        let first_created_at = config::read_config(&cfg_path).unwrap().tree.created_at;
+
+        // Second seed — should be a no-op (already seeded message, config unchanged)
+        seed_with_home(&home, output_dir, None).unwrap();
+        let second_created_at = config::read_config(&cfg_path).unwrap().tree.created_at;
+
+        assert_eq!(first_created_at, second_created_at);
     }
 }

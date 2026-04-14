@@ -41,6 +41,7 @@
 
 pub mod agent;
 pub mod branch;
+pub mod collect;
 pub mod compile;
 pub mod config;
 pub mod extract;
@@ -48,5 +49,5 @@ pub mod fetch;
 pub mod frontmatter;
 pub mod index;
 pub mod leaf;
-pub mod collect;
 pub mod slug;
+pub mod tree;
