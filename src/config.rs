@@ -131,10 +131,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = temp_config_path(&dir);
 
-        write_config(&make_config("/tmp/my-stash"), &path).unwrap();
+        write_config(&make_config("/tmp/my-tree"), &path).unwrap();
 
         let loaded = read_config(&path).unwrap();
-        assert_eq!(loaded.tree.output_dir, PathBuf::from("/tmp/my-stash"));
+        assert_eq!(loaded.tree.output_dir, PathBuf::from("/tmp/my-tree"));
     }
 
     #[test]

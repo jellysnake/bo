@@ -83,7 +83,7 @@ mod tests {
 
     fn old_config() -> TreeConfig {
         TreeConfig {
-            output_dir: PathBuf::from("/tmp/old-stash"),
+            output_dir: PathBuf::from("/tmp/old-tree"),
             name: None,
             created_at: None,
         }
@@ -100,8 +100,8 @@ mod tests {
     #[test]
     fn from_old_config_derives_name_from_dir_basename() {
         let tree = Tree::from_config(&old_config());
-        // name is derived from "old-stash" (basename of /tmp/old-stash)
-        assert_eq!(tree.name.as_deref(), Some("old-stash"));
+        // name is derived from "old-tree" (basename of /tmp/old-tree)
+        assert_eq!(tree.name.as_deref(), Some("old-tree"));
         assert!(tree.created_at.is_none());
     }
 
