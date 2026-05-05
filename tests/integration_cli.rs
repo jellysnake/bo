@@ -37,9 +37,9 @@ fn config_path(home: &TempDir) -> std::path::PathBuf {
 #[test]
 fn seed_creates_output_dir_and_config() {
     let home = TempDir::new().unwrap();
-    let stash = home.path().join("my-stash");
+    let tree = home.path().join("my-tree");
 
-    let out = seed(home.path(), &stash);
+    let out = seed(home.path(), &tree);
     assert!(
         out.status.success(),
         "stderr: {}",
@@ -47,26 +47,26 @@ fn seed_creates_output_dir_and_config() {
     );
 
     // Output dir created
-    assert!(stash.exists());
+    assert!(tree.exists());
 
     // Config written and contains the path
     let cfg_path = config_path(&home);
     assert!(cfg_path.exists());
     let contents = fs::read_to_string(&cfg_path).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&contents).unwrap();
-    assert_eq!(parsed["tree"]["output_dir"], stash.to_str().unwrap());
+    assert_eq!(parsed["tree"]["output_dir"], tree.to_str().unwrap());
 }
 
 #[test]
 fn seed_already_seeded_is_idempotent() {
     let home = TempDir::new().unwrap();
-    let stash = home.path().join("my-stash");
+    let tree = home.path().join("my-tree");
 
-    let out1 = seed(home.path(), &stash);
+    let out1 = seed(home.path(), &tree);
     assert!(out1.status.success());
 
     // Second seed with same dir: succeeds (no error), prints already-seeded message
-    let out2 = seed(home.path(), &stash);
+    let out2 = seed(home.path(), &tree);
     assert!(out2.status.success());
     let stdout = String::from_utf8_lossy(&out2.stdout);
     assert!(
@@ -78,7 +78,7 @@ fn seed_already_seeded_is_idempotent() {
     let cfg_path = config_path(&home);
     let contents = fs::read_to_string(&cfg_path).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&contents).unwrap();
-    assert_eq!(parsed["tree"]["output_dir"], stash.to_str().unwrap());
+    assert_eq!(parsed["tree"]["output_dir"], tree.to_str().unwrap());
 }
 
 #[test]
@@ -101,24 +101,24 @@ fn collect_without_seed_fails_with_helpful_message() {
 // ── raze ─────────────────────────────────────────────────────────────────────
 
 #[test]
-fn raze_removes_config_and_cleans_stash() {
+fn raze_removes_config_and_cleans_tree() {
     let home = TempDir::new().unwrap();
-    let stash = home.path().join("my-stash");
+    let tree = home.path().join("my-tree");
 
     // Seed
-    seed(home.path(), &stash);
+    seed(home.path(), &tree);
     assert!(config_path(&home).exists());
 
-    // Manually write a stash file and index entry so raze has something to delete
-    fs::create_dir_all(&stash).unwrap();
-    fs::write(stash.join("article.md"), "# Article").unwrap();
+    // Manually write a tree file and index entry so raze has something to delete
+    fs::create_dir_all(&tree).unwrap();
+    fs::write(tree.join("article.md"), "# Article").unwrap();
     let entry = serde_json::json!({
         "file": "article.md",
         "title": "Article",
         "url": "https://example.com/article"
     });
     fs::write(
-        stash.join("index.jsonl"),
+        tree.join("index.jsonl"),
         serde_json::to_string(&entry).unwrap(),
     )
     .unwrap();
@@ -133,9 +133,9 @@ fn raze_removes_config_and_cleans_stash() {
     // Config deleted
     assert!(!config_path(&home).exists());
 
-    // Stash file and index deleted
-    assert!(!stash.join("article.md").exists());
-    assert!(!stash.join("index.jsonl").exists());
+    // Tree file and index deleted
+    assert!(!tree.join("article.md").exists());
+    assert!(!tree.join("index.jsonl").exists());
 }
 
 #[test]
@@ -154,19 +154,19 @@ fn raze_without_seed_fails_with_helpful_message() {
 #[test]
 fn raze_tolerates_already_deleted_files() {
     let home = TempDir::new().unwrap();
-    let stash = home.path().join("my-stash");
+    let tree = home.path().join("my-tree");
 
-    seed(home.path(), &stash);
+    seed(home.path(), &tree);
 
     // Ledger references a file that doesn't exist on disk
-    fs::create_dir_all(&stash).unwrap();
+    fs::create_dir_all(&tree).unwrap();
     let entry = serde_json::json!({
         "file": "gone.md",
         "title": "Gone",
         "url": "https://example.com/gone"
     });
     fs::write(
-        stash.join("index.jsonl"),
+        tree.join("index.jsonl"),
         serde_json::to_string(&entry).unwrap(),
     )
     .unwrap();

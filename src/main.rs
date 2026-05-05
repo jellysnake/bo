@@ -11,7 +11,7 @@ use std::process;
 const NOT_SEEDED_MSG: &str = "bo hasn't been seeded yet — run: bo seed <output-dir>";
 
 #[derive(Parser)]
-#[command(name = "bo", about = "Stash web pages as local markdown")]
+#[command(name = "bo", about = "Collect web pages into a local markdown tree")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -19,9 +19,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialise a stash at <output-dir> and save config
+    /// Initialise a tree at <output-dir> and save config
     Seed {
-        /// Directory to store stashed content
+        /// Directory to store collected content
         output_dir: PathBuf,
         /// Human-readable name for the tree (defaults to the output directory basename)
         #[arg(long)]

@@ -25,7 +25,7 @@ use crate::{extract, fetch, index, leaf, slug};
 /// A document produced by the collect pipeline.
 #[derive(Debug)]
 pub struct Document {
-    /// Normalised URL that was stashed and recorded in the ledger.
+    /// Normalised URL that was collected and recorded in the index.
     pub url: String,
     /// Filename (including `.md` extension) written inside `output_dir`.
     pub filename: String,
@@ -34,7 +34,7 @@ pub struct Document {
 /// Unified error type for the collect pipeline.
 #[derive(Debug)]
 pub enum CollectError {
-    /// The URL has already been stashed; contains the existing filename.
+    /// The URL has already been collected; contains the existing filename.
     DuplicateUrl {
         existing_file: String,
     },

@@ -1,6 +1,6 @@
 # bo
 
-Stash web pages as local markdown.
+Collect web pages into a local markdown tree.
 
 ## Run locally
 
@@ -17,8 +17,8 @@ cargo install --path .
 ## Commands
 
 ```
-bo seed <output-dir>   # Initialise a stash
-bo collect <url>       # Fetch a URL and stash it
-OPENAI_API_KEY=sk-... bo compile  # Build linked knowledge graph from stashed docs
+bo seed <output-dir>   # Initialise a tree
+bo collect <url>       # Fetch a URL and collect it
+OPENAI_API_KEY=sk-... bo compile  # Build linked knowledge graph from collected docs
 bo raze                # Delete all bo-managed files and config
 ```
