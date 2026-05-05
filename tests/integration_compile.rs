@@ -6,21 +6,69 @@
 //   OPENAI_API_KEY=sk-... cargo test --test integration_compile -- --ignored
 
 use std::fs;
-use std::path::PathBuf;
 
 use bo::compile;
 use bo::config::Config;
 use bo::index;
 
-/// Copy the fixture collection into a temp directory and return the path.
+struct FixtureDoc {
+    file: &'static str,
+    title: &'static str,
+    url: &'static str,
+    body: &'static str,
+}
+
+const FIXTURE_DOCS: &[FixtureDoc] = &[
+    FixtureDoc {
+        file: "rust-ownership.md",
+        title: "Rust Ownership",
+        url: "https://example.com/rust-ownership",
+        body: "Rust's ownership model makes memory safety a compile-time property. Borrowing and lifetimes let programs share references without a garbage collector while still controlling resource cleanup precisely.",
+    },
+    FixtureDoc {
+        file: "memory-safety.md",
+        title: "Memory Safety",
+        url: "https://example.com/memory-safety",
+        body: "Memory safety matters in systems programming because pointer mistakes can become security bugs. Rust uses ownership, borrowing, and lifetimes to prevent dangling references and data races before runtime.",
+    },
+    FixtureDoc {
+        file: "safe-concurrency.md",
+        title: "Safe Concurrency",
+        url: "https://example.com/safe-concurrency",
+        body: "Safe concurrency depends on clear ownership of shared state. Rust's type system prevents data races by enforcing borrowing rules across threads and synchronisation boundaries.",
+    },
+    FixtureDoc {
+        file: "zero-cost-abstractions.md",
+        title: "Zero-Cost Abstractions",
+        url: "https://example.com/zero-cost-abstractions",
+        body: "Zero-cost abstractions allow high-level APIs without runtime penalties. In Rust, ownership and static dispatch let systems code remain expressive while preserving predictable memory and performance behaviour.",
+    },
+];
+
+/// Build a small synthetic tree in a temp directory and return the path.
 fn setup_fixture_collection() -> tempfile::TempDir {
     let dir = tempfile::TempDir::new().unwrap();
-    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/compile");
+    let index_path = dir.path().join("index.jsonl");
 
-    for entry in fs::read_dir(&fixtures).unwrap() {
-        let entry = entry.unwrap();
-        let dest = dir.path().join(entry.file_name());
-        fs::copy(entry.path(), &dest).unwrap();
+    for doc in FIXTURE_DOCS {
+        bo::leaf::write(
+            &dir.path().join(doc.file),
+            Some(doc.title),
+            doc.url,
+            "2025-06-01T10:00:00Z",
+            doc.body,
+        )
+        .unwrap();
+
+        index::append_entry(
+            &index_path,
+            &index::IndexEntry {
+                file: doc.file.to_string(),
+                title: doc.title.to_string(),
+                url: doc.url.to_string(),
+            },
+        )
+        .unwrap();
     }
 
     dir

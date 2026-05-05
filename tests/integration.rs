@@ -1,8 +1,8 @@
-// End-to-end integration tests using fixtures (no network).
+// End-to-end integration tests using inline HTML (no network).
 //
 // Tests exercise the full extract → write → index pipeline by calling
-// `bo::collect::collect_html` directly with fixture HTML. This avoids network
-// dependencies while covering the same code paths as `bo add <url>`.
+// `bo::collect::collect_html` directly. This avoids network dependencies while
+// covering the same code paths as `bo collect <url>` after fetch.
 
 use std::fs;
 use tempfile::TempDir;
