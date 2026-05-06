@@ -19,6 +19,11 @@ Somewhat formulated feature candidates. Keep items tickable. Promote one item at
   - Expected: for supported YouTube video URLs, fetch transcript text through open/public APIs if viable, or fail explicitly if transcripts are unavailable/disabled.
   - Notes: viability check should be part of the spec/research phase.
 
+- [ ] Improve extracted titles when UI chrome pollutes document metadata
+  - Context: mdBook/Rust Book pages currently collect useful body content but title/frontmatter/slug can become `Keyboard shortcuts` from page chrome.
+  - Expected: prefer content-specific headings/titles over navigation/help/UI labels, e.g. Rust Book ownership page becomes `Understanding Ownership`.
+  - Notes: keep separate from low-value rejection; this is extraction quality, not collection acceptance.
+
 ## Promotion rule
 
 Default: promote exactly one candidate into Speckit at a time.
