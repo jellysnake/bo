@@ -14,9 +14,10 @@ https://en.wiktionary.org/wiki/introduction
 https://react.dev/learn
 https://mariozechner.at/posts/2026-04-08-ive-sold-out/
 https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
+https://blog.google/innovation-and-ai/technology/developers-tools/multi-token-prediction-gemma-4/
+https://aidatainsider.com/news/shopify-uses-qwen-3-to-cut-inference-cost-by-75x/
 https://github.com/tursodatabase/agentfs
 https://openai.com/index/introducing-openai-privacy-filter/
-https://github.com/itayinbarr/little-coder/blob/main/docs/whitepaper.md
 https://github.com/intentee/paddler
 https://medium.com/@loci.ai/deploying-vllm-on-ecs-with-ec2-82d58b482125
 https://evroc.com/developer/blog/hitchhikers-guide-to-the-world-of-inference-the-bumpy-road-to-scalability
