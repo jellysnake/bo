@@ -21,6 +21,45 @@ use crate::engine::llm::{FinishReason, LlmError, Message, OpenAiProvider};
 
 const MAX_COMPLETION_TOKENS: u32 = 16384;
 
+// ── errors ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug)]
+pub enum CompileError {
+    /// Collection exceeds the model's context window.
+    ContextOverflow,
+    /// LLM output was truncated (hit max_completion_tokens).
+    Truncated,
+    /// Response blocked by content filter.
+    ContentFilter,
+    /// LLM API or network error.
+    Llm(String),
+    /// I/O or index error.
+    Io(String),
+    /// Validation error in the LLM response.
+    Validation(String),
+}
+
+impl std::fmt::Display for CompileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompileError::ContextOverflow => write!(
+                f,
+                "collection too large for model context window — \
+                 try reducing collection size or using a model with larger context"
+            ),
+            CompileError::Truncated => write!(
+                f,
+                "compile output was truncated — try reducing collection size or \
+                 using a model with larger output capacity"
+            ),
+            CompileError::ContentFilter => write!(f, "compile was blocked by content filter"),
+            CompileError::Llm(msg) => write!(f, "LLM error: {}", msg),
+            CompileError::Io(msg) => write!(f, "{}", msg),
+            CompileError::Validation(msg) => write!(f, "{}", msg),
+        }
+    }
+}
+
 const COMPILE_SYSTEM_PROMPT: &str = "\
 You are a knowledge compilation engine for a personal document collection.
 
@@ -100,10 +139,14 @@ struct ValidatedBranch {
 // ── cmd_compile ───────────────────────────────────────────────────────────────
 
 pub fn cmd_compile(cfg: &Config) -> Result<(), String> {
+    compile_pipeline(cfg).map_err(|e| e.to_string())
+}
+
+fn compile_pipeline(cfg: &Config) -> Result<(), CompileError> {
     // ── read index (guard: empty/single-leaf) ────────────────────────────────
     let index_path = cfg.tree.output_dir.join("index.jsonl");
-    let all_entries =
-        index::read_index(&index_path).map_err(|e| format!("failed to read index: {}", e))?;
+    let all_entries = index::read_index(&index_path)
+        .map_err(|e| CompileError::Io(format!("failed to read index: {}", e)))?;
 
     match all_entries.len() {
         0 => {
@@ -119,17 +162,19 @@ pub fn cmd_compile(cfg: &Config) -> Result<(), String> {
 
     // ── check OPENAI_API_KEY ─────────────────────────────────────────────────
     let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| {
-        "OPENAI_API_KEY is not set — bo compile requires an OpenAI API key".to_string()
+        CompileError::Io(
+            "OPENAI_API_KEY is not set — bo compile requires an OpenAI API key".to_string(),
+        )
     })?;
 
     // ── load valid leaves ────────────────────────────────────────────────────
     let (loaded_leaves, skipped_leaves) = read_valid_leaves(cfg, &all_entries);
 
     if loaded_leaves.is_empty() {
-        return Err(format!(
+        return Err(CompileError::Io(format!(
             "all {} leaves have unparseable frontmatter or are missing — nothing to compile",
             skipped_leaves.len()
-        ));
+        )));
     }
 
     if loaded_leaves.len() < 2 {
@@ -263,11 +308,11 @@ fn call_llm(
     model: &str,
     user_message: &str,
     schema: &Value,
-) -> Result<String, String> {
+) -> Result<String, CompileError> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .map_err(|e| format!("failed to create async runtime: {}", e))?;
+        .map_err(|e| CompileError::Io(format!("failed to create async runtime: {}", e)))?;
 
     rt.block_on(async {
         let provider = OpenAiProvider::new(api_key);
@@ -282,23 +327,17 @@ fn call_llm(
             .await
             .map_err(|e| match e {
                 LlmError::Api(msg) if msg.contains("maximum context length") => {
-                    "collection too large for model context window — \
-                     try reducing collection size or using a model with larger context"
-                        .to_string()
+                    CompileError::ContextOverflow
                 }
-                other => format!("LLM error: {}", other),
+                other => CompileError::Llm(other.to_string()),
             })?;
 
         if response.finish_reason == FinishReason::Length {
-            return Err(
-                "compile output was truncated — try reducing collection size or \
-                 using a model with larger output capacity"
-                    .to_string(),
-            );
+            return Err(CompileError::Truncated);
         }
 
         if response.finish_reason == FinishReason::ContentFilter {
-            return Err("compile was blocked by content filter".to_string());
+            return Err(CompileError::ContentFilter);
         }
 
         Ok(response.content)
@@ -310,9 +349,9 @@ fn call_llm(
 fn parse_and_validate(
     response: &str,
     valid_filenames: &HashSet<String>,
-) -> Result<CompilePlan, String> {
+) -> Result<CompilePlan, CompileError> {
     let parsed: CompileResponse = serde_json::from_str(response)
-        .map_err(|e| format!("failed to parse LLM response: {}", e))?;
+        .map_err(|e| CompileError::Validation(format!("failed to parse LLM response: {}", e)))?;
 
     // Empty branches is valid — means no cross-cutting concepts found
     if parsed.branches.is_empty() {
@@ -347,10 +386,10 @@ fn parse_and_validate(
             continue;
         }
         if seen_slugs.contains(&branch_slug) {
-            return Err(format!(
+            return Err(CompileError::Validation(format!(
                 "duplicate branch slug '{}' (from title '{}') — titles must be distinct",
                 branch_slug, raw.title
-            ));
+            )));
         }
         seen_slugs.insert(branch_slug.clone());
 
@@ -410,7 +449,7 @@ fn execute_plan(
     valid_filenames: &HashSet<String>,
     run_timestamp: &str,
     skipped_leaves: &[String],
-) -> Result<CompileSummary, String> {
+) -> Result<CompileSummary, CompileError> {
     let tree = Tree::from_config(&cfg.tree);
     let branches_dir = tree.branches_dir();
 
@@ -432,7 +471,7 @@ fn execute_plan(
             &compiled_at,
             run_timestamp,
         )
-        .map_err(|e| format!("failed to write branch '{}': {}", vb.slug, e))?;
+        .map_err(|e| CompileError::Io(format!("failed to write branch '{}': {}", vb.slug, e)))?;
 
         eprintln!("writing branch: {}", vb.slug);
 
@@ -542,6 +581,7 @@ pub fn print_summary(summary: &CompileSummary) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::fs;
     use tempfile::TempDir;
 
@@ -559,6 +599,7 @@ mod tests {
     // ── guard tests (ported) ──────────────────────────────────────────────────
 
     #[test]
+    #[serial]
     fn compile_exits_cleanly_on_empty_collection() {
         let dir = TempDir::new().unwrap();
         let cfg = make_test_config(dir.path());
@@ -569,6 +610,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn compile_exits_cleanly_on_single_leaf() {
         let dir = TempDir::new().unwrap();
         fs::write(
@@ -583,6 +625,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn compile_errors_without_api_key() {
         let dir = TempDir::new().unwrap();
         let index_path = dir.path().join("index.jsonl");
@@ -713,7 +756,8 @@ mod tests {
 
         let result = parse_and_validate(json, &sample_valid_filenames());
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("duplicate branch slug"));
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("duplicate branch slug"));
     }
 
     #[test]

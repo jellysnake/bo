@@ -104,14 +104,7 @@ fn to_api_message(m: &Message) -> Result<ChatCompletionRequestMessage, LlmError>
                 .map_err(|e| LlmError::Parse(e.to_string()))?,
         )),
         Role::Assistant => {
-            // Assistant messages are not needed for the compile pipeline,
-            // but included for trait completeness.
-            Ok(ChatCompletionRequestMessage::System(
-                ChatCompletionRequestSystemMessageArgs::default()
-                    .content(m.content.clone())
-                    .build()
-                    .map_err(|e| LlmError::Parse(e.to_string()))?,
-            ))
+            unreachable!("Assistant messages are not used in the compile pipeline")
         }
     }
 }
